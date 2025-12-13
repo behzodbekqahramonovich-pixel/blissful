@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
-from .serializers import LoginSerializer, UserSerializer, RefreshTokenSerializer
+from .serializers import LoginSerializer, UserLoginSerializer, RegisterSerializer, UserSerializer, RefreshTokenSerializer
 from .middleware import JWTAuthentication
 
 
@@ -60,6 +60,57 @@ class LoginView(APIView):
             'refresh': refresh_token,
             'user': UserSerializer(user).data,
         })
+
+
+class UserLoginView(APIView):
+    """
+    Regular user login endpoint.
+    Returns access and refresh JWT tokens.
+    """
+
+    def post(self, request):
+        serializer = UserLoginSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(
+                {'error': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = serializer.validated_data['user']
+        access_token, refresh_token = generate_tokens(user)
+
+        return Response({
+            'access': access_token,
+            'refresh': refresh_token,
+            'user': UserSerializer(user).data,
+        })
+
+
+class RegisterView(APIView):
+    """
+    User registration endpoint.
+    Creates a new user and returns access and refresh tokens.
+    """
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = serializer.save()
+        access_token, refresh_token = generate_tokens(user)
+
+        return Response({
+            'access': access_token,
+            'refresh': refresh_token,
+            'user': UserSerializer(user).data,
+            'message': 'Muvaffaqiyatli ro\'yxatdan o\'tdingiz!'
+        }, status=status.HTTP_201_CREATED)
 
 
 class RefreshTokenView(APIView):

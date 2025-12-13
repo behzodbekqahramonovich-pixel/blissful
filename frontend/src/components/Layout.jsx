@@ -1,8 +1,25 @@
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
+import RegisterModal from './RegisterModal'
+import LoginModal from './LoginModal'
+import useAuthStore from '../store/authStore'
 
 function Layout({ children }) {
   const location = useLocation()
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false)
+  const [isLoginOpen, setIsLoginOpen] = useState(false)
+  const { isAuthenticated, user, logout } = useAuthStore()
+
+  const handleSwitchToLogin = () => {
+    setIsRegisterOpen(false)
+    setIsLoginOpen(true)
+  }
+
+  const handleSwitchToRegister = () => {
+    setIsLoginOpen(false)
+    setIsRegisterOpen(true)
+  }
 
   const navLinks = [
     { path: '/', label: 'Bosh sahifa' },
@@ -39,6 +56,36 @@ function Layout({ children }) {
                   {link.label}
                 </Link>
               ))}
+
+              {/* Auth Section */}
+              {isAuthenticated ? (
+                <div className="flex items-center space-x-3 ml-4 pl-4 border-l border-gray-200">
+                  <span className="text-sm text-gray-700">
+                    {user?.first_name || user?.username || 'Foydalanuvchi'}
+                  </span>
+                  <button
+                    onClick={logout}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    Chiqish
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2 ml-4 pl-4 border-l border-gray-200">
+                  <button
+                    onClick={() => setIsLoginOpen(true)}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    Kirish
+                  </button>
+                  <button
+                    onClick={() => setIsRegisterOpen(true)}
+                    className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
+                  >
+                    Ro'yxatdan o'tish
+                  </button>
+                </div>
+              )}
             </nav>
           </div>
         </div>
@@ -78,6 +125,20 @@ function Layout({ children }) {
           </div>
         </div>
       </footer>
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        onSwitchToRegister={handleSwitchToRegister}
+      />
+
+      {/* Register Modal */}
+      <RegisterModal
+        isOpen={isRegisterOpen}
+        onClose={() => setIsRegisterOpen(false)}
+        onSwitchToLogin={handleSwitchToLogin}
+      />
     </div>
   )
 }

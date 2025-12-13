@@ -67,7 +67,7 @@ function CityAutocomplete({ value, onChange, placeholder }) {
                 onClick={() => handleSelect(city)}
                 className={clsx(
                   'w-full px-4 py-3 text-left hover:bg-primary-50 transition-colors',
-                  'flex items-center justify-between',
+                  'flex items-center justify-between text-gray-900',
                   value?.id === city.id && 'bg-primary-50'
                 )}
               >

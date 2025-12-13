@@ -73,6 +73,16 @@ export const authApi = {
     return response.data
   },
 
+  userLogin: async (username, password) => {
+    const response = await adminApi.post('/auth/user-login/', { username, password })
+    return response.data
+  },
+
+  register: async (data) => {
+    const response = await adminApi.post('/auth/register/', data)
+    return response.data
+  },
+
   refresh: async (refreshToken) => {
     const response = await adminApi.post('/auth/refresh/', { refresh: refreshToken })
     return response.data

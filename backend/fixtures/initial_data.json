@@ -1,0 +1,586 @@
+[
+  {
+    "model": "destinations.country",
+    "pk": 1,
+    "fields": {
+      "name": "Uzbekistan",
+      "name_uz": "O'zbekiston",
+      "code": "UZB",
+      "flag_emoji": "🇺🇿",
+      "currency": "UZS",
+      "visa_required_for_uz": false
+    }
+  },
+  {
+    "model": "destinations.country",
+    "pk": 2,
+    "fields": {
+      "name": "Turkey",
+      "name_uz": "Turkiya",
+      "code": "TUR",
+      "flag_emoji": "🇹🇷",
+      "currency": "TRY",
+      "visa_required_for_uz": false
+    }
+  },
+  {
+    "model": "destinations.country",
+    "pk": 3,
+    "fields": {
+      "name": "United Arab Emirates",
+      "name_uz": "BAA",
+      "code": "UAE",
+      "flag_emoji": "🇦🇪",
+      "currency": "AED",
+      "visa_required_for_uz": false
+    }
+  },
+  {
+    "model": "destinations.country",
+    "pk": 4,
+    "fields": {
+      "name": "Qatar",
+      "name_uz": "Qatar",
+      "code": "QAT",
+      "flag_emoji": "🇶🇦",
+      "currency": "QAR",
+      "visa_required_for_uz": false
+    }
+  },
+  {
+    "model": "destinations.country",
+    "pk": 5,
+    "fields": {
+      "name": "Thailand",
+      "name_uz": "Tailand",
+      "code": "THA",
+      "flag_emoji": "🇹🇭",
+      "currency": "THB",
+      "visa_required_for_uz": false
+    }
+  },
+  {
+    "model": "destinations.country",
+    "pk": 6,
+    "fields": {
+      "name": "Malaysia",
+      "name_uz": "Malayziya",
+      "code": "MYS",
+      "flag_emoji": "🇲🇾",
+      "currency": "MYR",
+      "visa_required_for_uz": false
+    }
+  },
+  {
+    "model": "destinations.country",
+    "pk": 7,
+    "fields": {
+      "name": "Singapore",
+      "name_uz": "Singapur",
+      "code": "SGP",
+      "flag_emoji": "🇸🇬",
+      "currency": "SGD",
+      "visa_required_for_uz": true
+    }
+  },
+  {
+    "model": "destinations.country",
+    "pk": 8,
+    "fields": {
+      "name": "Egypt",
+      "name_uz": "Misr",
+      "code": "EGY",
+      "flag_emoji": "🇪🇬",
+      "currency": "EGP",
+      "visa_required_for_uz": true
+    }
+  },
+  {
+    "model": "destinations.city",
+    "pk": 1,
+    "fields": {
+      "country": 1,
+      "name": "Tashkent",
+      "name_uz": "Toshkent",
+      "iata_code": "TAS",
+      "latitude": "41.3110560",
+      "longitude": "69.2797220",
+      "is_hub": false,
+      "avg_hotel_price_usd": "45.00"
+    }
+  },
+  {
+    "model": "destinations.city",
+    "pk": 2,
+    "fields": {
+      "country": 1,
+      "name": "Samarkand",
+      "name_uz": "Samarqand",
+      "iata_code": "SKD",
+      "latitude": "39.6542780",
+      "longitude": "66.9597220",
+      "is_hub": false,
+      "avg_hotel_price_usd": "35.00"
+    }
+  },
+  {
+    "model": "destinations.city",
+    "pk": 3,
+    "fields": {
+      "country": 2,
+      "name": "Istanbul",
+      "name_uz": "Istanbul",
+      "iata_code": "IST",
+      "latitude": "41.0082380",
+      "longitude": "28.9783890",
+      "is_hub": true,
+      "avg_hotel_price_usd": "80.00"
+    }
+  },
+  {
+    "model": "destinations.city",
+    "pk": 4,
+    "fields": {
+      "country": 2,
+      "name": "Antalya",
+      "name_uz": "Antalya",
+      "iata_code": "AYT",
+      "latitude": "36.8968890",
+      "longitude": "30.7133330",
+      "is_hub": false,
+      "avg_hotel_price_usd": "70.00"
+    }
+  },
+  {
+    "model": "destinations.city",
+    "pk": 5,
+    "fields": {
+      "country": 3,
+      "name": "Dubai",
+      "name_uz": "Dubai",
+      "iata_code": "DXB",
+      "latitude": "25.2048490",
+      "longitude": "55.2707830",
+      "is_hub": true,
+      "avg_hotel_price_usd": "120.00"
+    }
+  },
+  {
+    "model": "destinations.city",
+    "pk": 6,
+    "fields": {
+      "country": 3,
+      "name": "Abu Dhabi",
+      "name_uz": "Abu Dhabi",
+      "iata_code": "AUH",
+      "latitude": "24.4538890",
+      "longitude": "54.3773330",
+      "is_hub": true,
+      "avg_hotel_price_usd": "110.00"
+    }
+  },
+  {
+    "model": "destinations.city",
+    "pk": 7,
+    "fields": {
+      "country": 4,
+      "name": "Doha",
+      "name_uz": "Doha",
+      "iata_code": "DOH",
+      "latitude": "25.2866670",
+      "longitude": "51.5333330",
+      "is_hub": true,
+      "avg_hotel_price_usd": "130.00"
+    }
+  },
+  {
+    "model": "destinations.city",
+    "pk": 8,
+    "fields": {
+      "country": 5,
+      "name": "Bangkok",
+      "name_uz": "Bangkok",
+      "iata_code": "BKK",
+      "latitude": "13.7563310",
+      "longitude": "100.5017650",
+      "is_hub": true,
+      "avg_hotel_price_usd": "50.00"
+    }
+  },
+  {
+    "model": "destinations.city",
+    "pk": 9,
+    "fields": {
+      "country": 6,
+      "name": "Kuala Lumpur",
+      "name_uz": "Kuala Lumpur",
+      "iata_code": "KUL",
+      "latitude": "3.1390000",
+      "longitude": "101.6869000",
+      "is_hub": true,
+      "avg_hotel_price_usd": "60.00"
+    }
+  },
+  {
+    "model": "destinations.city",
+    "pk": 10,
+    "fields": {
+      "country": 7,
+      "name": "Singapore",
+      "name_uz": "Singapur",
+      "iata_code": "SIN",
+      "latitude": "1.3520830",
+      "longitude": "103.8198360",
+      "is_hub": true,
+      "avg_hotel_price_usd": "150.00"
+    }
+  },
+  {
+    "model": "destinations.city",
+    "pk": 11,
+    "fields": {
+      "country": 8,
+      "name": "Cairo",
+      "name_uz": "Qohira",
+      "iata_code": "CAI",
+      "latitude": "30.0444200",
+      "longitude": "31.2357120",
+      "is_hub": false,
+      "avg_hotel_price_usd": "55.00"
+    }
+  },
+  {
+    "model": "destinations.city",
+    "pk": 12,
+    "fields": {
+      "country": 8,
+      "name": "Sharm El Sheikh",
+      "name_uz": "Sharm El Sheikh",
+      "iata_code": "SSH",
+      "latitude": "27.9158000",
+      "longitude": "34.3300000",
+      "is_hub": false,
+      "avg_hotel_price_usd": "65.00"
+    }
+  },
+  {
+    "model": "pricing.flightprice",
+    "pk": 1,
+    "fields": {
+      "origin": 1,
+      "destination": 3,
+      "price_usd": "250.00",
+      "airline": "Uzbekistan Airways",
+      "flight_duration_minutes": 360,
+      "departure_date": "2024-07-15",
+      "departure_time": "08:00:00",
+      "arrival_time": "12:00:00",
+      "is_roundtrip": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.flightprice",
+    "pk": 2,
+    "fields": {
+      "origin": 3,
+      "destination": 1,
+      "price_usd": "250.00",
+      "airline": "Turkish Airlines",
+      "flight_duration_minutes": 360,
+      "departure_date": "2024-07-22",
+      "departure_time": "14:00:00",
+      "arrival_time": "20:00:00",
+      "is_roundtrip": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.flightprice",
+    "pk": 3,
+    "fields": {
+      "origin": 1,
+      "destination": 5,
+      "price_usd": "180.00",
+      "airline": "Flydubai",
+      "flight_duration_minutes": 240,
+      "departure_date": "2024-07-15",
+      "departure_time": "06:00:00",
+      "arrival_time": "09:00:00",
+      "is_roundtrip": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.flightprice",
+    "pk": 4,
+    "fields": {
+      "origin": 5,
+      "destination": 3,
+      "price_usd": "120.00",
+      "airline": "Emirates",
+      "flight_duration_minutes": 240,
+      "departure_date": "2024-07-16",
+      "departure_time": "10:00:00",
+      "arrival_time": "14:00:00",
+      "is_roundtrip": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.flightprice",
+    "pk": 5,
+    "fields": {
+      "origin": 3,
+      "destination": 1,
+      "price_usd": "230.00",
+      "airline": "Turkish Airlines",
+      "flight_duration_minutes": 360,
+      "departure_date": "2024-07-22",
+      "departure_time": "16:00:00",
+      "arrival_time": "22:00:00",
+      "is_roundtrip": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.flightprice",
+    "pk": 6,
+    "fields": {
+      "origin": 1,
+      "destination": 7,
+      "price_usd": "200.00",
+      "airline": "Qatar Airways",
+      "flight_duration_minutes": 300,
+      "departure_date": "2024-07-15",
+      "departure_time": "02:00:00",
+      "arrival_time": "05:00:00",
+      "is_roundtrip": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.flightprice",
+    "pk": 7,
+    "fields": {
+      "origin": 7,
+      "destination": 3,
+      "price_usd": "130.00",
+      "airline": "Qatar Airways",
+      "flight_duration_minutes": 300,
+      "departure_date": "2024-07-16",
+      "departure_time": "08:00:00",
+      "arrival_time": "12:00:00",
+      "is_roundtrip": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.flightprice",
+    "pk": 8,
+    "fields": {
+      "origin": 5,
+      "destination": 7,
+      "price_usd": "80.00",
+      "airline": "Emirates",
+      "flight_duration_minutes": 90,
+      "departure_date": "2024-07-16",
+      "departure_time": "14:00:00",
+      "arrival_time": "15:30:00",
+      "is_roundtrip": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.flightprice",
+    "pk": 9,
+    "fields": {
+      "origin": 1,
+      "destination": 8,
+      "price_usd": "350.00",
+      "airline": "Thai Airways",
+      "flight_duration_minutes": 480,
+      "departure_date": "2024-07-15",
+      "departure_time": "22:00:00",
+      "arrival_time": "08:00:00",
+      "is_roundtrip": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.flightprice",
+    "pk": 10,
+    "fields": {
+      "origin": 8,
+      "destination": 1,
+      "price_usd": "350.00",
+      "airline": "Thai Airways",
+      "flight_duration_minutes": 480,
+      "departure_date": "2024-07-22",
+      "departure_time": "10:00:00",
+      "arrival_time": "18:00:00",
+      "is_roundtrip": false,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.hotelprice",
+    "pk": 1,
+    "fields": {
+      "city": 3,
+      "hotel_name": "Grand Hyatt Istanbul",
+      "stars": 5,
+      "price_per_night_usd": "150.00",
+      "rating": "9.2",
+      "checkin_date": "2024-07-15",
+      "image_url": "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400",
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.hotelprice",
+    "pk": 2,
+    "fields": {
+      "city": 3,
+      "hotel_name": "Hilton Istanbul",
+      "stars": 4,
+      "price_per_night_usd": "90.00",
+      "rating": "8.5",
+      "checkin_date": "2024-07-15",
+      "image_url": "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=400",
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.hotelprice",
+    "pk": 3,
+    "fields": {
+      "city": 3,
+      "hotel_name": "Istanbul City Hotel",
+      "stars": 3,
+      "price_per_night_usd": "55.00",
+      "rating": "7.8",
+      "checkin_date": "2024-07-15",
+      "image_url": "https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=400",
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.hotelprice",
+    "pk": 4,
+    "fields": {
+      "city": 5,
+      "hotel_name": "Burj Al Arab",
+      "stars": 5,
+      "price_per_night_usd": "500.00",
+      "rating": "9.8",
+      "checkin_date": "2024-07-15",
+      "image_url": "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400",
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.hotelprice",
+    "pk": 5,
+    "fields": {
+      "city": 5,
+      "hotel_name": "JW Marriott Dubai",
+      "stars": 4,
+      "price_per_night_usd": "120.00",
+      "rating": "8.7",
+      "checkin_date": "2024-07-15",
+      "image_url": "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=400",
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.hotelprice",
+    "pk": 6,
+    "fields": {
+      "city": 5,
+      "hotel_name": "Dubai Inn",
+      "stars": 3,
+      "price_per_night_usd": "60.00",
+      "rating": "7.5",
+      "checkin_date": "2024-07-15",
+      "image_url": "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400",
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.hotelprice",
+    "pk": 7,
+    "fields": {
+      "city": 7,
+      "hotel_name": "W Doha",
+      "stars": 5,
+      "price_per_night_usd": "180.00",
+      "rating": "9.0",
+      "checkin_date": "2024-07-15",
+      "image_url": "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=400",
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.hotelprice",
+    "pk": 8,
+    "fields": {
+      "city": 7,
+      "hotel_name": "Doha Marriott",
+      "stars": 4,
+      "price_per_night_usd": "100.00",
+      "rating": "8.3",
+      "checkin_date": "2024-07-15",
+      "image_url": null,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.hotelprice",
+    "pk": 9,
+    "fields": {
+      "city": 8,
+      "hotel_name": "Mandarin Oriental Bangkok",
+      "stars": 5,
+      "price_per_night_usd": "200.00",
+      "rating": "9.4",
+      "checkin_date": "2024-07-15",
+      "image_url": null,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "pricing.hotelprice",
+    "pk": 10,
+    "fields": {
+      "city": 8,
+      "hotel_name": "Bangkok City Hotel",
+      "stars": 3,
+      "price_per_night_usd": "35.00",
+      "rating": "7.6",
+      "checkin_date": "2024-07-15",
+      "image_url": null,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  }
+]

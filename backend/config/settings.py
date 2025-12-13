@@ -30,6 +30,8 @@ INSTALLED_APPS = [
     'apps.destinations',
     'apps.pricing',
     'apps.search',
+    'apps.authentication',
+    'apps.admin_api',
 ]
 
 MIDDLEWARE = [

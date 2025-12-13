@@ -10,4 +10,6 @@ urlpatterns = [
     path('api/v1/destinations/', include('apps.destinations.urls')),
     path('api/v1/prices/', include('apps.pricing.urls')),
     path('api/v1/search/', include('apps.search.urls')),
+    path('api/v1/auth/', include('apps.authentication.urls')),
+    path('api/v1/admin/', include('apps.admin_api.urls')),
 ]

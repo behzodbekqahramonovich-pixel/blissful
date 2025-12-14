@@ -868,20 +868,34 @@ class RouteOptimizer:
             except Exception as e:
                 logger.error(f"Booking.com API xatosi: {e}")
 
-        # 2. Lokal bazadan qidirish
-        hotel = HotelPrice.objects.filter(
-            city__iata_code=city_code,
-            stars__gte=self.hotel_stars
-        ).order_by('price_per_night_usd').first()
+        # 2. Lokal bazadan qidirish (faqat hostel bo'lmagan holda)
+        if self.hotel_stars > 1:
+            hotel = HotelPrice.objects.filter(
+                city__iata_code=city_code,
+                stars__gte=self.hotel_stars
+            ).order_by('price_per_night_usd').first()
 
-        if hotel:
-            return hotel.price_per_night_usd * nights
+            if hotel:
+                return hotel.price_per_night_usd * nights
 
-        # 3. Shahar o'rtacha narxi
-        if city and city.avg_hotel_price_usd:
-            return city.avg_hotel_price_usd * nights
+        # 3. Taxminiy narxlar (hostel va mehmonxona turlari bo'yicha)
+        # Shahar bo'yicha taxminiy narxlar (1=hostel)
+        fallback_prices = {
+            'IST': {1: 15, 3: 55, 4: 95, 5: 180},
+            'DXB': {1: 20, 3: 45, 4: 85, 5: 200},
+            'DOH': {1: 25, 3: 60, 4: 110, 5: 200},
+            'BKK': {1: 8, 3: 25, 4: 65, 5: 150},
+            'KUL': {1: 10, 3: 35, 4: 80, 5: 150},
+            'SIN': {1: 25, 3: 70, 4: 150, 5: 300},
+            'CAI': {1: 10, 3: 35, 4: 90, 5: 180},
+            'TAS': {1: 12, 3: 40, 4: 70, 5: 120},
+        }
 
-        return Decimal('50') * nights
+        city_fallback = fallback_prices.get(city_code, {1: 15, 3: 50, 4: 100, 5: 200})
+        price_per_night = city_fallback.get(self.hotel_stars, 50)
+
+        logger.info(f"Fallback hotel: {city_code} {self.hotel_stars}* = ${price_per_night}/kecha")
+        return Decimal(str(price_per_night)) * nights
 
     def _get_city_name(self, code: str) -> str:
         """Shahar nomini olish"""

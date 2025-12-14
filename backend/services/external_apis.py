@@ -532,30 +532,39 @@ class BookingComAPI:
         """API ishlamasa, taxminiy narxlar"""
         nights = (checkout_date - checkin_date).days
 
-        # Shahar bo'yicha taxminiy narxlar
+        # Shahar bo'yicha taxminiy narxlar (1=hostel, 3-5=yulduzli mehmonxona)
         city_prices = {
-            'Istanbul': {3: 55, 4: 95, 5: 180},
-            'Dubai': {3: 45, 4: 85, 5: 200},
-            'Dubay': {3: 45, 4: 85, 5: 200},
-            'Doha': {3: 60, 4: 110, 5: 200},
-            'Bangkok': {3: 25, 4: 65, 5: 150},
-            'Kuala Lumpur': {3: 35, 4: 80, 5: 150},
-            'Kuala-Lumpur': {3: 35, 4: 80, 5: 150},
-            'Singapore': {3: 70, 4: 150, 5: 300},
-            'Singapur': {3: 70, 4: 150, 5: 300},
-            'Cairo': {3: 35, 4: 90, 5: 180},
-            'Qohira': {3: 35, 4: 90, 5: 180},
+            'Istanbul': {1: 15, 3: 55, 4: 95, 5: 180},
+            'Dubai': {1: 20, 3: 45, 4: 85, 5: 200},
+            'Dubay': {1: 20, 3: 45, 4: 85, 5: 200},
+            'Doha': {1: 25, 3: 60, 4: 110, 5: 200},
+            'Bangkok': {1: 8, 3: 25, 4: 65, 5: 150},
+            'Kuala Lumpur': {1: 10, 3: 35, 4: 80, 5: 150},
+            'Kuala-Lumpur': {1: 10, 3: 35, 4: 80, 5: 150},
+            'Singapore': {1: 25, 3: 70, 4: 150, 5: 300},
+            'Singapur': {1: 25, 3: 70, 4: 150, 5: 300},
+            'Cairo': {1: 10, 3: 35, 4: 90, 5: 180},
+            'Qohira': {1: 10, 3: 35, 4: 90, 5: 180},
         }
 
-        prices = city_prices.get(city_name, {3: 50, 4: 100, 5: 200})
+        prices = city_prices.get(city_name, {1: 15, 3: 50, 4: 100, 5: 200})
         price_per_night = prices.get(min_stars, 50)
 
+        # Hostel yoki mehmonxona nomini aniqlash
+        if min_stars == 1:
+            hotel_name = f'{city_name} Hostel'
+            hotel_type = 'Hostel'
+        else:
+            hotel_name = f'{city_name} {min_stars}-Star Hotel'
+            hotel_type = f'{min_stars}-Star'
+
         return [{
-            'hotel_name': f'{city_name} {min_stars}-Star Hotel',
+            'hotel_name': hotel_name,
             'stars': min_stars,
+            'hotel_type': hotel_type,
             'price_per_night': float(price_per_night),
             'total_price': float(price_per_night * nights),
-            'rating': 8.0,
+            'rating': 7.5 if min_stars == 1 else 8.0,
             'address': city_name,
             'image_url': '',
         }]

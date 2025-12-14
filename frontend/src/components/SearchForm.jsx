@@ -169,9 +169,10 @@ function SearchForm({ compact = false }) {
                 onChange={(e) => setHotelStars(Number(e.target.value))}
                 className="input"
               >
-                <option value={3}>3 yulduz</option>
-                <option value={4}>4 yulduz</option>
-                <option value={5}>5 yulduz</option>
+                <option value={1}>🏠 Hostel</option>
+                <option value={3}>⭐⭐⭐ 3 yulduz</option>
+                <option value={4}>⭐⭐⭐⭐ 4 yulduz</option>
+                <option value={5}>⭐⭐⭐⭐⭐ 5 yulduz</option>
               </select>
             </div>
 

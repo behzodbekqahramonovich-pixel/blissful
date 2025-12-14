@@ -170,6 +170,7 @@ function SearchForm({ compact = false }) {
                 className="input"
               >
                 <option value={1}>🏠 Hostel</option>
+                <option value={2}>⭐⭐ 2 yulduz</option>
                 <option value={3}>⭐⭐⭐ 3 yulduz</option>
                 <option value={4}>⭐⭐⭐⭐ 4 yulduz</option>
                 <option value={5}>⭐⭐⭐⭐⭐ 5 yulduz</option>

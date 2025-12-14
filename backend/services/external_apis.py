@@ -394,9 +394,26 @@ class BookingComAPI:
     Booking.com API integratsiyasi (RapidAPI orqali)
 
     RapidAPI: https://rapidapi.com/apidojo/api/booking-com
+    Bepul: 500 so'rov/oy
     """
 
     BASE_URL = "https://booking-com.p.rapidapi.com/v1"
+
+    # Shahar ID lari keshi (API chaqiruvlarini kamaytirish uchun)
+    CITY_IDS = {
+        'Istanbul': '-755070',
+        'Dubai': '-782831',
+        'Doha': '-551013',
+        'Bangkok': '-3414440',
+        'Kuala Lumpur': '-2403010',
+        'Singapore': '-73635',
+        'Cairo': '-290692',
+        'Tashkent': '-653837',
+        'Moscow': '-2960561',
+        'Bali': '-2701757',
+        'Phuket': '-3418536',
+        'Maldives': '-1282890',
+    }
 
     def __init__(self):
         self.api_key = os.getenv('RAPIDAPI_KEY', '')
@@ -404,10 +421,21 @@ class BookingComAPI:
             'X-RapidAPI-Key': self.api_key,
             'X-RapidAPI-Host': 'booking-com.p.rapidapi.com'
         }
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
 
     def is_configured(self) -> bool:
         """API sozlanganligini tekshirish"""
         return bool(self.api_key and self.api_key != 'your_rapidapi_key_here')
+
+    def get_api_status(self) -> Dict[str, Any]:
+        """API holatini tekshirish"""
+        return {
+            'configured': self.is_configured(),
+            'api_key_set': bool(self.api_key),
+            'base_url': self.BASE_URL,
+            'cached_cities': list(self.CITY_IDS.keys()),
+        }
 
     def search_hotels(
         self,
@@ -417,10 +445,11 @@ class BookingComAPI:
         adults: int = 1,
         rooms: int = 1,
         currency: str = 'USD',
-        min_stars: int = 3
+        min_stars: int = 3,
+        use_cache: bool = True
     ) -> List[Dict]:
         """
-        Mehmonxona narxlarini qidirish
+        Booking.com dan mehmonxona narxlarini qidirish
 
         Args:
             city_name: Shahar nomi (masalan, 'Istanbul')
@@ -429,20 +458,41 @@ class BookingComAPI:
             adults: Kattalar soni
             rooms: Xonalar soni
             currency: Valyuta
-            min_stars: Minimal yulduzlar
+            min_stars: Minimal yulduzlar (1=hostel, 2-5=yulduzli)
+            use_cache: Keshdan foydalanish
 
         Returns:
             Mehmonxonalar ro'yxati
         """
+        # Keshni tekshirish
+        cache_key = f"booking:{city_name}:{checkin_date}:{checkout_date}:{min_stars}"
+        cache_key_hash = hashlib.md5(cache_key.encode()).hexdigest()
+
+        if use_cache:
+            cached = cache.get(cache_key_hash)
+            if cached:
+                logger.info(f"Booking.com keshdan: {city_name}")
+                return cached
+
         if not self.is_configured():
-            logger.warning("Booking.com API sozlanmagan, test ma'lumotlar qaytariladi")
+            logger.warning("Booking.com API sozlanmagan, fallback narxlar qaytariladi")
             return self._get_fallback_hotels(city_name, checkin_date, checkout_date, min_stars)
 
         try:
-            # Avval shahar ID sini topish
-            dest_id = self._get_destination_id(city_name)
+            # Avval keshdan shahar ID sini olish
+            dest_id = self.CITY_IDS.get(city_name)
             if not dest_id:
+                dest_id = self._get_destination_id(city_name)
+            if not dest_id:
+                logger.warning(f"Booking.com: {city_name} topilmadi")
                 return self._get_fallback_hotels(city_name, checkin_date, checkout_date, min_stars)
+
+            # Yulduz filtri (hostel uchun maxsus)
+            class_filter = None
+            if min_stars == 1:
+                class_filter = '0'  # Hostel/budget
+            elif min_stars >= 2:
+                class_filter = str(min_stars)
 
             params = {
                 'dest_id': dest_id,
@@ -456,19 +506,31 @@ class BookingComAPI:
                 'filter_by_currency': currency,
                 'units': 'metric',
                 'locale': 'en-gb',
+                'page_number': 0,
+                'include_adjacency': 'true',
             }
 
-            response = requests.get(
+            if class_filter:
+                params['categories_filter_ids'] = f'class::{class_filter}'
+
+            response = self.session.get(
                 f"{self.BASE_URL}/hotels/search",
-                headers=self.headers,
                 params=params,
-                timeout=15
+                timeout=20
             )
             response.raise_for_status()
             data = response.json()
 
+            hotels = []
             if data.get('result'):
-                return self._parse_hotels(data['result'], min_stars)
+                hotels = self._parse_hotels(data['result'], min_stars)
+                logger.info(f"Booking.com API: {city_name} - {len(hotels)} ta mehmonxona topildi")
+
+                # Keshga saqlash (1 soat)
+                if hotels and use_cache:
+                    cache.set(cache_key_hash, hotels, 3600)
+
+                return hotels
 
             return self._get_fallback_hotels(city_name, checkin_date, checkout_date, min_stars)
 

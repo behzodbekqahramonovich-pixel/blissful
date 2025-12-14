@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from .models import TravelSearch, RouteVariant
 from .serializers import (
     TravelSearchSerializer,
@@ -255,6 +255,75 @@ class FlightPriceCalendarView(APIView):
         })
 
 
+class LiveHotelPricesView(APIView):
+    """
+    Booking.com dan real vaqtda mehmonxona narxlarini olish
+
+    GET /api/hotels/live/?city=Istanbul&checkin=2025-01-15&checkout=2025-01-22&stars=3
+    """
+
+    def get(self, request):
+        city = request.query_params.get('city', '')
+        checkin_str = request.query_params.get('checkin')
+        checkout_str = request.query_params.get('checkout')
+        stars = int(request.query_params.get('stars', 3))
+        refresh = request.query_params.get('refresh', 'false').lower() == 'true'
+
+        if not city:
+            return Response(
+                {'error': 'city parametri majburiy'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Sanalarni parse qilish
+        try:
+            if checkin_str:
+                checkin_date = datetime.strptime(checkin_str, '%Y-%m-%d').date()
+            else:
+                checkin_date = date.today() + timedelta(days=7)
+
+            if checkout_str:
+                checkout_date = datetime.strptime(checkout_str, '%Y-%m-%d').date()
+            else:
+                checkout_date = checkin_date + timedelta(days=7)
+        except ValueError:
+            return Response(
+                {'error': 'Sana formati noto\'g\'ri. To\'g\'ri format: YYYY-MM-DD'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Mehmonxona narxlarini olish
+        hotels = booking_api.search_hotels(
+            city_name=city,
+            checkin_date=checkin_date,
+            checkout_date=checkout_date,
+            min_stars=stars,
+            use_cache=not refresh
+        )
+
+        # API holati
+        api_status = booking_api.get_api_status()
+
+        # Eng arzon mehmonxonani topish
+        cheapest = min(hotels, key=lambda x: x['price_per_night']) if hotels else None
+        nights = (checkout_date - checkin_date).days
+
+        return Response({
+            'success': True,
+            'city': city,
+            'checkin_date': checkin_date.isoformat(),
+            'checkout_date': checkout_date.isoformat(),
+            'nights': nights,
+            'stars': stars,
+            'hotels_count': len(hotels),
+            'cheapest_per_night': cheapest['price_per_night'] if cheapest else None,
+            'cheapest_total': cheapest['price_per_night'] * nights if cheapest else None,
+            'hotels': hotels[:10],  # Top 10
+            'api_configured': api_status['configured'],
+            'booking_link': f"https://www.booking.com/searchresults.html?ss={city}&checkin={checkin_date}&checkout={checkout_date}"
+        })
+
+
 class APIStatusView(APIView):
     """
     API integratsiyasi holatini tekshirish
@@ -266,7 +335,7 @@ class APIStatusView(APIView):
 
     def get(self, request):
         aviasales_status = travelpayouts_api.get_api_status()
-        booking_configured = booking_api.is_configured()
+        booking_status = booking_api.get_api_status()
 
         return Response({
             'aviasales': {
@@ -276,7 +345,7 @@ class APIStatusView(APIView):
                 'env_var': 'TRAVELPAYOUTS_TOKEN',
             },
             'booking': {
-                'configured': booking_configured,
+                **booking_status,
                 'description': 'Booking.com API - Mehmonxona narxlari',
                 'register_url': 'https://rapidapi.com/apidojo/api/booking-com',
                 'env_var': 'RAPIDAPI_KEY',
@@ -284,9 +353,9 @@ class APIStatusView(APIView):
             'instructions': {
                 'uz': 'API larni ishga tushirish uchun .env fayliga tokenlarni qo\'shing',
                 'steps': [
-                    '1. https://www.travelpayouts.com/ da ro\'yxatdan o\'ting',
-                    '2. API token oling',
-                    '3. backend/.env fayliga TRAVELPAYOUTS_TOKEN=your_token qo\'shing',
+                    '1. Aviasales: https://www.travelpayouts.com/ - TRAVELPAYOUTS_TOKEN',
+                    '2. Booking: https://rapidapi.com/apidojo/api/booking-com - RAPIDAPI_KEY',
+                    '3. backend/.env fayliga tokenlarni qo\'shing',
                     '4. Serverni qayta ishga tushiring'
                 ]
             }

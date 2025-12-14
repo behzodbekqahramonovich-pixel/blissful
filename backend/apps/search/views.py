@@ -12,6 +12,7 @@ from .serializers import (
 )
 from apps.destinations.models import City
 from services.route_finder import RouteFinder
+from services.route_optimizer import RouteOptimizer
 
 
 class TravelSearchViewSet(viewsets.ModelViewSet):
@@ -46,10 +47,20 @@ class TravelSearchViewSet(viewsets.ModelViewSet):
             budget_max_usd=data.get('budget_max')
         )
 
-        # Yo'nalishlarni topish
-        finder = RouteFinder(search)
-        variants = finder.find_all_routes()
-        saved_variants = finder.save_variants(variants)
+        # Optimallashtirish rejimini olish
+        optimization_mode = request.data.get('optimization_mode', 'balanced')
+        use_optimizer = request.data.get('use_optimizer', True)
+
+        if use_optimizer:
+            # Yangi ilg'or optimizer ishlatish
+            optimizer = RouteOptimizer(search)
+            variants = optimizer.find_optimal_route(mode=optimization_mode)
+            saved_variants = optimizer.save_variants(variants)
+        else:
+            # Eski finder ishlatish
+            finder = RouteFinder(search)
+            variants = finder.find_all_routes()
+            saved_variants = finder.save_variants(variants)
 
         # Tavsiya qilingan variant
         recommended = next(
@@ -60,7 +71,11 @@ class TravelSearchViewSet(viewsets.ModelViewSet):
         result = {
             'search': TravelSearchSerializer(search).data,
             'variants': RouteVariantSerializer(saved_variants, many=True).data,
-            'recommended': RouteVariantSerializer(recommended).data if recommended else None
+            'recommended': RouteVariantSerializer(recommended).data if recommended else None,
+            'optimization': {
+                'mode': optimization_mode,
+                'available_modes': ['cheapest', 'fastest', 'balanced', 'comfort']
+            }
         }
 
         return Response(result, status=status.HTTP_201_CREATED)

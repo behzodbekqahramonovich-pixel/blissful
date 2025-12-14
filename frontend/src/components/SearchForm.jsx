@@ -7,6 +7,14 @@ import { destinationsApi, searchApi } from '../services/api'
 import useSearchStore from '../store/searchStore'
 import CityAutocomplete from './CityAutocomplete'
 
+// Optimallashtirish rejimlari
+const OPTIMIZATION_MODES = [
+  { id: 'balanced', label: 'Muvozanatli', icon: '⚖️', description: 'Narx va vaqt muvozanati' },
+  { id: 'cheapest', label: 'Eng arzon', icon: '💰', description: 'Eng past narx' },
+  { id: 'fastest', label: 'Eng tez', icon: '⚡', description: 'Eng qisqa vaqt' },
+  { id: 'comfort', label: 'Qulay', icon: '✨', description: 'Kam almashinuv' },
+]
+
 function SearchForm({ compact = false }) {
   const navigate = useNavigate()
   const { searchParams, setSearchParams, setSearchResults, setLoading, setError } = useSearchStore()
@@ -18,6 +26,8 @@ function SearchForm({ compact = false }) {
   const [travelers, setTravelers] = useState(1)
   const [includeTransit, setIncludeTransit] = useState(true)
   const [hotelStars, setHotelStars] = useState(3)
+  const [optimizationMode, setOptimizationMode] = useState('balanced')
+  const [budgetMax, setBudgetMax] = useState('')
   const [isSearching, setIsSearching] = useState(false)
 
   const handleSubmit = async (e) => {
@@ -41,6 +51,9 @@ function SearchForm({ compact = false }) {
         travelers,
         include_transit: includeTransit,
         hotel_stars: hotelStars,
+        optimization_mode: optimizationMode,
+        budget_max: budgetMax ? parseFloat(budgetMax) : null,
+        use_optimizer: true,
       }
 
       const results = await searchApi.createSearch(searchData)
@@ -107,50 +120,88 @@ function SearchForm({ compact = false }) {
 
       {/* Qo'shimcha parametrlar */}
       {!compact && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Yo'lovchilar */}
+        <>
+          {/* Optimallashtirish rejimi */}
           <div>
-            <label className="label">Yo'lovchilar soni</label>
-            <select
-              value={travelers}
-              onChange={(e) => setTravelers(Number(e.target.value))}
-              className="input"
-            >
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                <option key={num} value={num}>
-                  {num} kishi
-                </option>
+            <label className="label mb-2">Optimallashtirish rejimi</label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {OPTIMIZATION_MODES.map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => setOptimizationMode(mode.id)}
+                  className={`p-3 rounded-xl border-2 transition-all duration-200 ${
+                    optimizationMode === mode.id
+                      ? 'border-primary-500 bg-primary-50 text-primary-700 shadow-md'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">{mode.icon}</div>
+                  <div className="font-medium text-sm">{mode.label}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{mode.description}</div>
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
-          {/* Mehmonxona yulduzlari */}
-          <div>
-            <label className="label">Mehmonxona darajasi</label>
-            <select
-              value={hotelStars}
-              onChange={(e) => setHotelStars(Number(e.target.value))}
-              className="input"
-            >
-              <option value={3}>3 yulduz</option>
-              <option value={4}>4 yulduz</option>
-              <option value={5}>5 yulduz</option>
-            </select>
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Yo'lovchilar */}
+            <div>
+              <label className="label">Yo'lovchilar soni</label>
+              <select
+                value={travelers}
+                onChange={(e) => setTravelers(Number(e.target.value))}
+                className="input"
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                  <option key={num} value={num}>
+                    {num} kishi
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Tranzit */}
-          <div className="flex items-center pt-7">
-            <label className="flex items-center cursor-pointer">
+            {/* Mehmonxona yulduzlari */}
+            <div>
+              <label className="label">Mehmonxona darajasi</label>
+              <select
+                value={hotelStars}
+                onChange={(e) => setHotelStars(Number(e.target.value))}
+                className="input"
+              >
+                <option value={3}>3 yulduz</option>
+                <option value={4}>4 yulduz</option>
+                <option value={5}>5 yulduz</option>
+              </select>
+            </div>
+
+            {/* Maksimal byudjet */}
+            <div>
+              <label className="label">Maksimal byudjet (USD)</label>
               <input
-                type="checkbox"
-                checked={includeTransit}
-                onChange={(e) => setIncludeTransit(e.target.checked)}
-                className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                type="number"
+                value={budgetMax}
+                onChange={(e) => setBudgetMax(e.target.value)}
+                placeholder="Ixtiyoriy"
+                className="input"
+                min="0"
               />
-              <span className="ml-2 text-gray-700">Tranzit variantlarni ko'rsatish</span>
-            </label>
+            </div>
+
+            {/* Tranzit */}
+            <div className="flex items-center pt-7">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeTransit}
+                  onChange={(e) => setIncludeTransit(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="ml-2 text-gray-700">Tranzit variantlarni ko'rsatish</span>
+              </label>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Qidirish tugmasi */}

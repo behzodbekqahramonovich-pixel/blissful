@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
+from datetime import datetime, date
 from .models import TravelSearch, RouteVariant
 from .serializers import (
     TravelSearchSerializer,
@@ -13,6 +14,7 @@ from .serializers import (
 from apps.destinations.models import City
 from services.route_finder import RouteFinder
 from services.route_optimizer import RouteOptimizer
+from services.external_apis import travelpayouts_api, booking_api
 
 
 class TravelSearchViewSet(viewsets.ModelViewSet):
@@ -132,3 +134,160 @@ class RouteVariantViewSet(viewsets.ReadOnlyModelViewSet):
     """Yo'nalish varianti API"""
     queryset = RouteVariant.objects.select_related('search').all()
     serializer_class = RouteVariantSerializer
+
+
+class LiveFlightPricesView(APIView):
+    """
+    Aviasales.uz dan real vaqtda parvoz narxlarini olish
+
+    GET /api/flights/live/?origin=TAS&destination=IST&date=2024-03-15
+
+    Bu API Aviasales.uz (Travelpayouts) dan real vaqtda narxlarni oladi.
+    Narxlar 5 daqiqa keshlanadi.
+    """
+
+    def get(self, request):
+        origin = request.query_params.get('origin', '').upper()
+        destination = request.query_params.get('destination', '').upper()
+        departure_date_str = request.query_params.get('date')
+        return_date_str = request.query_params.get('return_date')
+        direct_only = request.query_params.get('direct', 'false').lower() == 'true'
+        currency = request.query_params.get('currency', 'usd').lower()
+        refresh = request.query_params.get('refresh', 'false').lower() == 'true'
+
+        # Validatsiya
+        if not origin or not destination:
+            return Response(
+                {'error': 'origin va destination parametrlari majburiy'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(origin) != 3 or len(destination) != 3:
+            return Response(
+                {'error': 'IATA kodlari 3 ta belgidan iborat bo\'lishi kerak (masalan: TAS, IST)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Sanani parse qilish
+        try:
+            if departure_date_str:
+                departure_date = datetime.strptime(departure_date_str, '%Y-%m-%d').date()
+            else:
+                departure_date = date.today()
+
+            return_date = None
+            if return_date_str:
+                return_date = datetime.strptime(return_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response(
+                {'error': 'Sana formati noto\'g\'ri. To\'g\'ri format: YYYY-MM-DD'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Real vaqtda narxlarni olish
+        flights = travelpayouts_api.search_flights(
+            origin=origin,
+            destination=destination,
+            departure_date=departure_date,
+            return_date=return_date,
+            direct=direct_only,
+            currency=currency,
+            use_cache=not refresh  # refresh=true bo'lsa, keshni o'tkazib yuborish
+        )
+
+        # API holati
+        api_status = travelpayouts_api.get_api_status()
+
+        # Eng arzon narxni topish
+        cheapest = min(flights, key=lambda x: x['price']) if flights else None
+
+        return Response({
+            'success': True,
+            'origin': origin,
+            'destination': destination,
+            'departure_date': departure_date.isoformat(),
+            'return_date': return_date.isoformat() if return_date else None,
+            'currency': currency,
+            'flights_count': len(flights),
+            'cheapest_price': cheapest['price'] if cheapest else None,
+            'flights': flights,
+            'data_source': flights[0]['data_source'] if flights else 'none',
+            'api_configured': api_status['configured'],
+            'aviasales_link': f"https://www.aviasales.uz/search/{origin}{departure_date.strftime('%d%m')}{destination}1"
+        })
+
+
+class FlightPriceCalendarView(APIView):
+    """
+    Oylik narxlar kalendarini olish
+
+    GET /api/flights/calendar/?origin=TAS&destination=IST&month=2024-03
+
+    Bu API Aviasales.uz dan butun oy uchun eng arzon narxlarni oladi.
+    """
+
+    def get(self, request):
+        origin = request.query_params.get('origin', '').upper()
+        destination = request.query_params.get('destination', '').upper()
+        month = request.query_params.get('month')  # Format: YYYY-MM
+
+        if not origin or not destination:
+            return Response(
+                {'error': 'origin va destination parametrlari majburiy'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not month:
+            # Joriy oy
+            month = date.today().strftime('%Y-%m')
+
+        # Kalendar narxlarini olish
+        prices = travelpayouts_api.get_prices_calendar(origin, destination, month)
+
+        return Response({
+            'success': True,
+            'origin': origin,
+            'destination': destination,
+            'month': month,
+            'prices': prices,
+            'cheapest_date': min(prices.items(), key=lambda x: x[1])[0] if prices else None,
+            'cheapest_price': min(prices.values()) if prices else None,
+        })
+
+
+class APIStatusView(APIView):
+    """
+    API integratsiyasi holatini tekshirish
+
+    GET /api/status/
+
+    Bu API Travelpayouts va Booking.com integratsiyasi holatini ko'rsatadi.
+    """
+
+    def get(self, request):
+        aviasales_status = travelpayouts_api.get_api_status()
+        booking_configured = booking_api.is_configured()
+
+        return Response({
+            'aviasales': {
+                **aviasales_status,
+                'description': 'Aviasales.uz / Travelpayouts API - Parvoz narxlari',
+                'register_url': 'https://www.travelpayouts.com/',
+                'env_var': 'TRAVELPAYOUTS_TOKEN',
+            },
+            'booking': {
+                'configured': booking_configured,
+                'description': 'Booking.com API - Mehmonxona narxlari',
+                'register_url': 'https://rapidapi.com/apidojo/api/booking-com',
+                'env_var': 'RAPIDAPI_KEY',
+            },
+            'instructions': {
+                'uz': 'API larni ishga tushirish uchun .env fayliga tokenlarni qo\'shing',
+                'steps': [
+                    '1. https://www.travelpayouts.com/ da ro\'yxatdan o\'ting',
+                    '2. API token oling',
+                    '3. backend/.env fayliga TRAVELPAYOUTS_TOKEN=your_token qo\'shing',
+                    '4. Serverni qayta ishga tushiring'
+                ]
+            }
+        })

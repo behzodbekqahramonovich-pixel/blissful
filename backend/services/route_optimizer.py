@@ -7,9 +7,11 @@ Bu servis quyidagi funksiyalarni o'z ichiga oladi:
 3. Ko'p kriteriyali baholash (narx, vaqt, qulaylik)
 4. Byudjet cheklovlari
 5. Vaqt optimallashtiruvi
+6. Real API integratsiya (Travelpayouts, Booking.com)
 """
 
 import heapq
+import logging
 from decimal import Decimal
 from datetime import timedelta, datetime
 from typing import List, Dict, Optional, Tuple
@@ -18,6 +20,9 @@ from django.db.models import Min, Avg, Q
 from apps.destinations.models import City
 from apps.pricing.models import FlightPrice, HotelPrice
 from apps.search.models import TravelSearch, RouteVariant
+from services.external_apis import travelpayouts_api, booking_api
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -289,7 +294,9 @@ class RouteOptimizer:
                 'airline': flight_info['airline'],
                 'duration': flight_info['duration'],
                 'date': str(current_date),
-                'type': 'outbound' if i == 0 else 'transit'
+                'type': 'outbound' if i == 0 else 'transit',
+                'data_source': flight_info.get('data_source', 'unknown'),
+                'link': flight_info.get('link', ''),
             }
             segments.append(segment)
             total_flight_cost += flight_info['price']
@@ -314,7 +321,9 @@ class RouteOptimizer:
             'airline': return_flight['airline'],
             'duration': return_flight['duration'],
             'date': str(self.return_date),
-            'type': 'inbound'
+            'type': 'inbound',
+            'data_source': return_flight.get('data_source', 'unknown'),
+            'link': return_flight.get('link', ''),
         })
         total_flight_cost += return_flight['price']
         total_duration += return_flight['duration']
@@ -437,7 +446,9 @@ class RouteOptimizer:
                         'airline': outbound['airline'],
                         'duration': outbound['duration'],
                         'date': str(self.departure_date),
-                        'type': 'outbound'
+                        'type': 'outbound',
+                        'data_source': outbound.get('data_source', 'unknown'),
+                        'link': outbound.get('link', ''),
                     },
                     {
                         'from': self.destination.iata_code,
@@ -448,7 +459,9 @@ class RouteOptimizer:
                         'airline': inbound['airline'],
                         'duration': inbound['duration'],
                         'date': str(self.return_date),
-                        'type': 'inbound'
+                        'type': 'inbound',
+                        'data_source': inbound.get('data_source', 'unknown'),
+                        'link': inbound.get('link', ''),
                     }
                 ],
                 'hotels': [{
@@ -556,7 +569,9 @@ class RouteOptimizer:
                         'airline': seg1['airline'],
                         'duration': seg1['duration'],
                         'date': str(self.departure_date),
-                        'type': 'outbound'
+                        'type': 'outbound',
+                        'data_source': seg1.get('data_source', 'unknown'),
+                        'link': seg1.get('link', ''),
                     },
                     {
                         'from': hub_code,
@@ -567,7 +582,9 @@ class RouteOptimizer:
                         'airline': seg2['airline'],
                         'duration': seg2['duration'],
                         'date': str(hub_departure),
-                        'type': 'transit'
+                        'type': 'transit',
+                        'data_source': seg2.get('data_source', 'unknown'),
+                        'link': seg2.get('link', ''),
                     },
                     {
                         'from': self.destination.iata_code,
@@ -578,7 +595,9 @@ class RouteOptimizer:
                         'airline': seg3['airline'],
                         'duration': seg3['duration'],
                         'date': str(self.return_date),
-                        'type': 'inbound'
+                        'type': 'inbound',
+                        'data_source': seg3.get('data_source', 'unknown'),
+                        'link': seg3.get('link', ''),
                     }
                 ],
                 'hotels': [
@@ -698,7 +717,9 @@ class RouteOptimizer:
                         'airline': seg1['airline'],
                         'duration': seg1['duration'],
                         'date': str(self.departure_date),
-                        'type': 'outbound'
+                        'type': 'outbound',
+                        'data_source': seg1.get('data_source', 'unknown'),
+                        'link': seg1.get('link', ''),
                     },
                     {
                         'from': hub1,
@@ -709,7 +730,9 @@ class RouteOptimizer:
                         'airline': seg2['airline'],
                         'duration': seg2['duration'],
                         'date': str(hub1_departure),
-                        'type': 'transit'
+                        'type': 'transit',
+                        'data_source': seg2.get('data_source', 'unknown'),
+                        'link': seg2.get('link', ''),
                     },
                     {
                         'from': hub2,
@@ -720,7 +743,9 @@ class RouteOptimizer:
                         'airline': seg3['airline'],
                         'duration': seg3['duration'],
                         'date': str(hub2_departure),
-                        'type': 'transit'
+                        'type': 'transit',
+                        'data_source': seg3.get('data_source', 'unknown'),
+                        'link': seg3.get('link', ''),
                     },
                     {
                         'from': self.destination.iata_code,
@@ -731,7 +756,9 @@ class RouteOptimizer:
                         'airline': seg4['airline'],
                         'duration': seg4['duration'],
                         'date': str(self.return_date),
-                        'type': 'inbound'
+                        'type': 'inbound',
+                        'data_source': seg4.get('data_source', 'unknown'),
+                        'link': seg4.get('link', ''),
                     }
                 ],
                 'hotels': [
@@ -766,7 +793,25 @@ class RouteOptimizer:
         }
 
     def _get_flight_info(self, origin: str, dest: str, date) -> Dict:
-        """Parvoz ma'lumotlarini olish"""
+        """Parvoz ma'lumotlarini olish - Real API yoki bazadan"""
+
+        # 1. Real API dan olishga urinish (Travelpayouts / Aviasales.uz)
+        try:
+            flights = travelpayouts_api.search_flights(origin, dest, date)
+            if flights:
+                cheapest = min(flights, key=lambda x: x['price'])
+                logger.info(f"Aviasales: {origin}->{dest} = ${cheapest['price']} ({cheapest.get('data_source', 'unknown')})")
+                return {
+                    'price': cheapest['price'],
+                    'airline': cheapest.get('airline', 'Aviakompaniya'),
+                    'duration': cheapest.get('duration', 240),
+                    'data_source': cheapest.get('data_source', 'unknown'),
+                    'link': cheapest.get('link', ''),
+                }
+        except Exception as e:
+            logger.error(f"Aviasales API xatosi: {e}")
+
+        # 2. Lokal bazadan qidirish
         flight = FlightPrice.objects.filter(
             origin__iata_code=origin,
             destination__iata_code=dest,
@@ -777,30 +822,53 @@ class RouteOptimizer:
             return {
                 'price': float(flight.price_usd),
                 'airline': flight.airline,
-                'duration': flight.flight_duration_minutes
+                'duration': flight.flight_duration_minutes,
+                'data_source': 'database',
             }
 
-        # O'rtacha narxni tekshirish
+        # 3. O'rtacha narxni tekshirish
         avg_price = FlightPrice.objects.filter(
             origin__iata_code=origin,
             destination__iata_code=dest
         ).aggregate(avg=Avg('price_usd'))['avg']
 
         if avg_price:
-            return {'price': float(avg_price), 'airline': 'Aviakompaniya', 'duration': 240}
+            return {'price': float(avg_price), 'airline': 'Aviakompaniya', 'duration': 240, 'data_source': 'database_avg'}
 
-        # Graf dan olish
+        # 4. Graf dan olish
         for neighbor, price, duration, airline in self.graph.get(origin, []):
             if neighbor == dest:
-                return {'price': price, 'airline': airline, 'duration': duration}
+                return {'price': price, 'airline': airline, 'duration': duration, 'data_source': 'estimated'}
 
-        return {'price': 200, 'airline': 'Aviakompaniya', 'duration': 240}
+        return {'price': 200, 'airline': 'Aviakompaniya', 'duration': 240, 'data_source': 'fallback'}
 
     def _get_hotel_cost(self, city_code: str, nights: int) -> Decimal:
-        """Mehmonxona narxini olish"""
+        """Mehmonxona narxini olish - Real API yoki bazadan"""
         if nights <= 0:
             return Decimal('0')
 
+        city = self.cities.get(city_code)
+        city_name = city.name if city else city_code
+
+        # 1. Real API dan olishga urinish (Booking.com)
+        if booking_api.is_configured():
+            try:
+                checkin = self.departure_date
+                checkout = checkin + timedelta(days=nights)
+                hotel_data = booking_api.get_cheapest_hotel(
+                    city_name,
+                    checkin,
+                    checkout,
+                    min_stars=self.hotel_stars
+                )
+                if hotel_data:
+                    price_per_night = hotel_data['price_per_night']
+                    logger.info(f"Booking.com: {city_name} {self.hotel_stars}* = ${price_per_night}/kecha")
+                    return Decimal(str(price_per_night)) * nights
+            except Exception as e:
+                logger.error(f"Booking.com API xatosi: {e}")
+
+        # 2. Lokal bazadan qidirish
         hotel = HotelPrice.objects.filter(
             city__iata_code=city_code,
             stars__gte=self.hotel_stars
@@ -809,7 +877,7 @@ class RouteOptimizer:
         if hotel:
             return hotel.price_per_night_usd * nights
 
-        city = self.cities.get(city_code)
+        # 3. Shahar o'rtacha narxi
         if city and city.avg_hotel_price_usd:
             return city.avg_hotel_price_usd * nights
 

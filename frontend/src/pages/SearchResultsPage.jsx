@@ -60,6 +60,21 @@ function SearchResultsPage() {
         <p className="text-gray-600 mt-2">
           {search.departure_date} - {search.return_date} | {search.travelers} kishi | {search.nights} kecha
         </p>
+
+        {/* Aviasales.uz havola */}
+        <div className="mt-4 flex items-center space-x-4">
+          <a
+            href={`https://www.aviasales.uz/search/${search.origin_details?.iata_code}${search.departure_date?.replace(/-/g, '').slice(4, 8)}${search.destination_details?.iata_code}1`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+          >
+            Aviasales.uz da ko'rish →
+          </a>
+          <span className="text-xs text-gray-400">
+            Narxlar Aviasales.uz dan olinadi
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -102,20 +117,20 @@ function SearchResultsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Parvozlar:</span>
-                  <span className="font-medium">${activeVariant.total_flight_cost.toFixed(0)}</span>
+                  <span className="font-medium">${parseFloat(activeVariant.total_flight_cost).toFixed(0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Mehmonxonalar:</span>
-                  <span className="font-medium">${activeVariant.total_hotel_cost.toFixed(0)}</span>
+                  <span className="font-medium">${parseFloat(activeVariant.total_hotel_cost).toFixed(0)}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold border-t pt-3">
                   <span>JAMI:</span>
-                  <span className="text-primary-600">${activeVariant.total_cost.toFixed(0)}</span>
+                  <span className="text-primary-600">${parseFloat(activeVariant.total_cost).toFixed(0)}</span>
                 </div>
 
-                {activeVariant.savings_percent > 0 && (
+                {parseFloat(activeVariant.savings_percent) > 0 && (
                   <div className="bg-green-100 rounded-lg p-3 text-center text-green-700">
-                    💰 ${activeVariant.savings_amount.toFixed(0)} tejaysiz!
+                    💰 ${parseFloat(activeVariant.savings_amount).toFixed(0)} tejaysiz!
                   </div>
                 )}
               </div>

@@ -14,6 +14,13 @@ function RouteVariantCard({ variant, index, onSelect, isSelected }) {
     details,
   } = variant
 
+  // Convert string values to numbers
+  const flightCost = parseFloat(total_flight_cost) || 0
+  const hotelCost = parseFloat(total_hotel_cost) || 0
+  const totalCost = parseFloat(total_cost) || 0
+  const savingsPercent = parseFloat(savings_percent) || 0
+  const savingsAmt = parseFloat(savings_amount) || 0
+
   const getRouteTypeIcon = () => {
     switch (route_type) {
       case 'direct':
@@ -100,23 +107,38 @@ function RouteVariantCard({ variant, index, onSelect, isSelected }) {
       <div className="border-t pt-4 space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Parvozlar:</span>
-          <span className="font-medium">${total_flight_cost.toFixed(0)}</span>
+          <span className="font-medium">${flightCost.toFixed(0)}</span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Mehmonxonalar:</span>
-          <span className="font-medium">${total_hotel_cost.toFixed(0)}</span>
+          <span className="font-medium">${hotelCost.toFixed(0)}</span>
         </div>
         <div className="flex justify-between text-lg font-bold border-t pt-2">
           <span>JAMI:</span>
-          <span className="text-primary-600">${total_cost.toFixed(0)}</span>
+          <span className="text-primary-600">${totalCost.toFixed(0)}</span>
         </div>
+        {/* Ma'lumot manbasi */}
+        {details?.segments?.[0]?.data_source && (
+          <div className="flex justify-end mt-2">
+            <span className={clsx(
+              'text-xs px-2 py-0.5 rounded',
+              details.segments[0].data_source === 'travelpayouts_api' ? 'bg-green-100 text-green-700' :
+              details.segments[0].data_source === 'travelpayouts_free' ? 'bg-blue-100 text-blue-700' :
+              'bg-gray-100 text-gray-600'
+            )}>
+              {details.segments[0].data_source === 'travelpayouts_api' ? '🔴 Real vaqt (Aviasales)' :
+               details.segments[0].data_source === 'travelpayouts_free' ? '🟡 Aviasales (cache)' :
+               '⚪ Taxminiy narx'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Savings */}
-      {savings_percent > 0 && (
+      {savingsPercent > 0 && (
         <div className="mt-4 bg-green-50 rounded-lg p-3 text-center">
           <span className="text-green-700 font-medium">
-            💰 TEJAMKORLIK: ${savings_amount.toFixed(0)} ({savings_percent.toFixed(0)}% arzon)
+            💰 TEJAMKORLIK: ${savingsAmt.toFixed(0)} ({savingsPercent.toFixed(0)}% arzon)
           </span>
         </div>
       )}

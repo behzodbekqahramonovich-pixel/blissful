@@ -50,6 +50,8 @@ class RouteVariant(models.Model):
         ('direct', "To'g'ridan-to'g'ri"),
         ('transit', "Tranzit"),
         ('multi', "Multi-city"),
+        ('optimal_cheap', "Optimal (arzon)"),
+        ('optimal_fast', "Optimal (tez)"),
     ]
 
     search = models.ForeignKey(

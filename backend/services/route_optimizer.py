@@ -471,7 +471,8 @@ class RouteOptimizer:
                     'price_per_night': float(hotel_cost / self.nights) if self.nights > 0 else 0,
                     'total_price': float(hotel_cost),
                     'stars': self.hotel_stars
-                }]
+                }],
+                'bonus': "Eng tez va qulay sayohat! Vaqtingizni tejang."
             }
         }
 
@@ -623,7 +624,9 @@ class RouteOptimizer:
                     'name': self._get_city_name(hub_code),
                     'country': hub.country.name_uz if hub and hub.country else '',
                     'flag': hub.country.flag_emoji if hub and hub.country else ''
-                }
+                },
+                'bonus': f"2 ta mamlakatni ko'rasiz! {self._get_city_name(hub_code)} shahriga tashrif buyuring.",
+                'countries_count': 2
             }
         }
 
@@ -788,7 +791,7 @@ class RouteOptimizer:
                     }
                 ],
                 'countries_count': 3,
-                'bonus': f"{3} ta mamlakatni ko'rasiz!"
+                'bonus': f"3 ta mamlakatni ko'rasiz! {self._get_city_name(hub1)} va {self._get_city_name(hub2)} orqali ajoyib sayohat."
             }
         }
 

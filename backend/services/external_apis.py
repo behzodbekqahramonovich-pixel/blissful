@@ -6,6 +6,11 @@ Booking.com (RapidAPI) - Mehmonxona narxlari
 """
 
 import os
+from dotenv import load_dotenv
+
+# .env faylini yuklash
+load_dotenv()
+
 import re
 import json
 import requests
@@ -651,3 +656,4 @@ class BookingComAPI:
 # API instanslari
 travelpayouts_api = TravelpayoutsAPI()
 booking_api = BookingComAPI()
+

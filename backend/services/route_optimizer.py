@@ -353,9 +353,22 @@ class RouteOptimizer:
                     'type': route_type,
                     'algorithm': 'dijkstra',
                     'path_length': len(path)
-                }
+                },
+                'bonus': self._get_bonus_for_path(path, route_type)
             }
         }
+
+    def _get_bonus_for_path(self, path: List[str], route_type: str) -> str:
+        """Yo'l uchun bonus xabarini yaratish"""
+        stops = len(path) - 2
+        if stops == 0:
+            return "Eng tez va qulay sayohat! Vaqtingizni tejang."
+        elif stops == 1:
+            hub = path[1]
+            return f"2 ta mamlakatni ko'rasiz! {self._get_city_name(hub)} shahriga tashrif buyuring."
+        else:
+            cities = [self._get_city_name(c) for c in path[1:-1]]
+            return f"{stops + 1} ta mamlakatni ko'rasiz! {', '.join(cities)} orqali ajoyib sayohat."
 
     def _calculate_hotels_for_path(self, path: List[str]) -> List[Dict]:
         """Yo'l uchun mehmonxonalarni hisoblash"""

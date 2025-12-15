@@ -109,14 +109,14 @@ function Layout({ children }) {
             </div>
             <div>
               <h3 className="text-white font-semibold mb-3">Aloqa</h3>
-              <p className="text-sm">info@blissfultour.uz</p>
-              <p className="text-sm">+998 90 123 45 67</p>
+              <p className="text-sm">behzodbekqahramonovich@gmail.com</p>
+              <p className="text-sm">+998 90 526 87 38</p>
             </div>
             <div>
               <h3 className="text-white font-semibold mb-3">Ijtimoiy tarmoqlar</h3>
               <div className="flex space-x-4">
-                <a href="#" className="hover:text-white transition-colors">Telegram</a>
-                <a href="#" className="hover:text-white transition-colors">Instagram</a>
+                <a href="https://t.me/behzodqahramonovich" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Telegram</a>
+                <a href="https://instagram.com/behzodqahramonovich" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Instagram</a>
               </div>
             </div>
           </div>

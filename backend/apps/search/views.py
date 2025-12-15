@@ -15,6 +15,7 @@ from apps.destinations.models import City
 from services.route_finder import RouteFinder
 from services.route_optimizer import RouteOptimizer
 from services.external_apis import travelpayouts_api, booking_api
+from services.popular_routes_scraper import popular_routes_scraper
 
 
 class TravelSearchViewSet(viewsets.ModelViewSet):
@@ -92,42 +93,17 @@ class TravelSearchViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def popular(self, request):
-        """Mashhur yo'nalishlar"""
-        popular_routes = [
-            {
-                'origin': 'TAS',
-                'origin_name': 'Toshkent',
-                'destination': 'IST',
-                'destination_name': 'Istanbul',
-                'avg_price': 450,
-                'image': 'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=400'
-            },
-            {
-                'origin': 'TAS',
-                'origin_name': 'Toshkent',
-                'destination': 'DXB',
-                'destination_name': 'Dubai',
-                'avg_price': 380,
-                'image': 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400'
-            },
-            {
-                'origin': 'TAS',
-                'origin_name': 'Toshkent',
-                'destination': 'BKK',
-                'destination_name': 'Bangkok',
-                'avg_price': 520,
-                'image': 'https://images.unsplash.com/photo-1508009603885-50cf7c579365?w=400'
-            },
-            {
-                'origin': 'TAS',
-                'origin_name': 'Toshkent',
-                'destination': 'KUL',
-                'destination_name': 'Kuala Lumpur',
-                'avg_price': 480,
-                'image': 'https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=400'
-            }
-        ]
-        return Response(popular_routes)
+        """Mashhur yo'nalishlar - avtomatik tavsiya"""
+        origin = request.query_params.get('origin', 'TAS')
+        limit = int(request.query_params.get('limit', 6))
+
+        # Scraper orqali tavsiyalarni olish
+        recommendations = popular_routes_scraper.get_recommendations(
+            origin=origin,
+            limit=limit
+        )
+
+        return Response(recommendations)
 
 
 class RouteVariantViewSet(viewsets.ReadOnlyModelViewSet):

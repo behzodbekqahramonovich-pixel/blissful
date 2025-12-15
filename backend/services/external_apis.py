@@ -428,10 +428,21 @@ class BookingComAPI:
         }
         self.session = requests.Session()
         self.session.headers.update(self.headers)
+        self._last_request_time = None
+        self._min_request_interval = 1.0  # Minimal 1 sekund oralig'i
 
     def is_configured(self) -> bool:
         """API sozlanganligini tekshirish"""
         return bool(self.api_key and self.api_key != 'your_rapidapi_key_here')
+
+    def _rate_limit(self):
+        """Rate limiting - so'rovlar orasida minimal vaqt"""
+        import time
+        if self._last_request_time:
+            elapsed = time.time() - self._last_request_time
+            if elapsed < self._min_request_interval:
+                time.sleep(self._min_request_interval - elapsed)
+        self._last_request_time = time.time()
 
     def get_api_status(self) -> Dict[str, Any]:
         """API holatini tekshirish"""
@@ -518,11 +529,20 @@ class BookingComAPI:
             if class_filter:
                 params['categories_filter_ids'] = f'class::{class_filter}'
 
+            # Rate limiting qo'llash
+            self._rate_limit()
+
             response = self.session.get(
                 f"{self.BASE_URL}/hotels/search",
                 params=params,
-                timeout=20
+                timeout=15
             )
+
+            # 403 yoki 429 xatosi - fallback ishlatish
+            if response.status_code in [403, 429]:
+                logger.warning(f"Booking.com API rate limit ({response.status_code}), fallback ishlatiladi")
+                return self._get_fallback_hotels(city_name, checkin_date, checkout_date, min_stars)
+
             response.raise_for_status()
             data = response.json()
 
@@ -539,6 +559,9 @@ class BookingComAPI:
 
             return self._get_fallback_hotels(city_name, checkin_date, checkout_date, min_stars)
 
+        except requests.Timeout:
+            logger.warning(f"Booking.com API timeout: {city_name}")
+            return self._get_fallback_hotels(city_name, checkin_date, checkout_date, min_stars)
         except requests.RequestException as e:
             logger.error(f"Booking.com API xatosi: {e}")
             return self._get_fallback_hotels(city_name, checkin_date, checkout_date, min_stars)
@@ -546,26 +569,39 @@ class BookingComAPI:
     def _get_destination_id(self, city_name: str) -> Optional[str]:
         """Shahar ID sini topish"""
         try:
+            # Rate limiting qo'llash
+            self._rate_limit()
+
             params = {
                 'name': city_name,
                 'locale': 'en-gb',
             }
 
-            response = requests.get(
+            response = self.session.get(
                 f"{self.BASE_URL}/hotels/locations",
-                headers=self.headers,
                 params=params,
                 timeout=10
             )
+
+            # 403 yoki 429 xatosi
+            if response.status_code in [403, 429]:
+                logger.warning(f"Booking.com locations API rate limit ({response.status_code})")
+                return None
+
             response.raise_for_status()
             data = response.json()
 
             if data:
                 for item in data:
                     if item.get('dest_type') == 'city':
+                        # Keshga qo'shish
+                        self.CITY_IDS[city_name] = item.get('dest_id')
                         return item.get('dest_id')
             return None
 
+        except requests.Timeout:
+            logger.warning(f"Destination ID olishda timeout: {city_name}")
+            return None
         except requests.RequestException as e:
             logger.error(f"Destination ID olishda xato: {e}")
             return None

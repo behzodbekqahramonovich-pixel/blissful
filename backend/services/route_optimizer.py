@@ -66,7 +66,7 @@ class RouteOptimizer:
     MODE_BALANCED = 'balanced'      # Muvozanatli
     MODE_COMFORT = 'comfort'        # Eng qulay
 
-    def __init__(self, search: TravelSearch):
+    def __init__(self, search: TravelSearch, use_live_prices: bool = False):
         self.search = search
         self.origin = search.origin
         self.destination = search.destination
@@ -76,6 +76,12 @@ class RouteOptimizer:
         self.travelers = search.travelers
         self.hotel_stars = search.hotel_stars
         self.budget_max = float(search.budget_max_usd) if search.budget_max_usd else None
+        self.use_live_prices = use_live_prices
+
+        # Keshlar
+        self._avg_prices_cache = {}
+        self._hotel_cache = {}
+        self._live_prices_cache = {}
 
         # Graf tuzish
         self._build_flight_graph()
@@ -507,35 +513,18 @@ class RouteOptimizer:
         return variants[:3]
 
     def _get_dynamic_hubs(self) -> List[str]:
-        """Dinamik hub shaharlarni tanlash"""
-        # Eng arzon parvozlar bo'lgan shaharlarni topish
-        hubs = set()
+        """Dinamik hub shaharlarni tanlash - optimallashtirilgan"""
+        # Standart hub shaharlarni qaytarish (tez)
+        # Graf allaqachon eng arzon parvozlarni o'z ichiga oladi
+        standard_hubs = ['DXB', 'IST', 'DOH', 'BKK', 'KUL', 'SIN']
 
-        # Origin dan chiquvchi eng arzon parvozlar
-        outbound = FlightPrice.objects.filter(
-            origin__iata_code=self.origin.iata_code
-        ).values('destination__iata_code').annotate(
-            min_price=Min('price_usd')
-        ).order_by('min_price')[:5]
+        # Graf orqali qo'shimcha hublarni topish (DB so'rovsiz)
+        hubs = set(standard_hubs)
+        for dest, price, duration, airline in self.graph.get(self.origin.iata_code, []):
+            if dest not in [self.origin.iata_code, self.destination.iata_code]:
+                hubs.add(dest)
 
-        for flight in outbound:
-            hubs.add(flight['destination__iata_code'])
-
-        # Destination ga kiruvchi eng arzon parvozlar
-        inbound = FlightPrice.objects.filter(
-            destination__iata_code=self.destination.iata_code
-        ).values('origin__iata_code').annotate(
-            min_price=Min('price_usd')
-        ).order_by('min_price')[:5]
-
-        for flight in inbound:
-            hubs.add(flight['origin__iata_code'])
-
-        # Standart hub shaharlarni ham qo'shish
-        standard_hubs = ['DXB', 'IST', 'DOH', 'AUH', 'BKK', 'KUL', 'SIN']
-        hubs.update(standard_hubs)
-
-        return list(hubs)
+        return list(hubs)[:8]  # Maksimal 8 ta hub
 
     def _calculate_transit_variant(self, hub_code: str) -> Optional[Dict]:
         """Tranzit variant hisoblash"""
@@ -644,33 +633,27 @@ class RouteOptimizer:
         }
 
     def _find_smart_multi_city(self) -> List[Dict]:
-        """Aqlli ko'p shaharli marshrutlar"""
+        """Aqlli ko'p shaharli marshrutlar - optimallashtirilgan"""
         variants = []
-        hubs = self._get_dynamic_hubs()
 
-        # Eng yaxshi kombinatsiyalarni topish
-        best_combos = []
+        # Faqat eng mashhur kombinatsiyalar (tez)
+        popular_combos = [
+            ('DXB', 'IST'),
+            ('IST', 'DXB'),
+            ('DOH', 'BKK'),
+        ]
 
-        for hub1 in hubs[:5]:
-            for hub2 in hubs[:5]:
-                if hub1 == hub2:
-                    continue
-                if hub1 in [self.origin.iata_code, self.destination.iata_code]:
-                    continue
-                if hub2 in [self.origin.iata_code, self.destination.iata_code]:
-                    continue
+        for hub1, hub2 in popular_combos:
+            if hub1 in [self.origin.iata_code, self.destination.iata_code]:
+                continue
+            if hub2 in [self.origin.iata_code, self.destination.iata_code]:
+                continue
 
-                # Marshrutning umumiy narxini hisoblash
-                cost = self._estimate_multi_city_cost(hub1, hub2)
-                best_combos.append((cost, hub1, hub2))
-
-        # Eng arzon 3 ta kombinatsiyani olish
-        best_combos.sort(key=lambda x: x[0])
-
-        for cost, hub1, hub2 in best_combos[:2]:
             variant = self._calculate_multi_city_variant(hub1, hub2)
             if variant:
                 variants.append(variant)
+                if len(variants) >= 2:  # Maksimal 2 ta multi-city
+                    break
 
         return variants
 
@@ -809,25 +792,37 @@ class RouteOptimizer:
         }
 
     def _get_flight_info(self, origin: str, dest: str, date) -> Dict:
-        """Parvoz ma'lumotlarini olish - Real API yoki bazadan"""
+        """Parvoz ma'lumotlarini olish - Real API yoki lokal bazadan"""
 
-        # 1. Real API dan olishga urinish (Travelpayouts / Aviasales.uz)
-        try:
-            flights = travelpayouts_api.search_flights(origin, dest, date)
-            if flights:
-                cheapest = min(flights, key=lambda x: x['price'])
-                logger.info(f"Aviasales: {origin}->{dest} = ${cheapest['price']} ({cheapest.get('data_source', 'unknown')})")
-                return {
-                    'price': cheapest['price'],
-                    'airline': cheapest.get('airline', 'Aviakompaniya'),
-                    'duration': cheapest.get('duration', 240),
-                    'data_source': cheapest.get('data_source', 'unknown'),
-                    'link': cheapest.get('link', ''),
-                }
-        except Exception as e:
-            logger.error(f"Aviasales API xatosi: {e}")
+        # 0. Real vaqtda narxlar (agar yoqilgan bo'lsa)
+        if self.use_live_prices:
+            cache_key = (origin, dest, str(date))
+            if cache_key in self._live_prices_cache:
+                return self._live_prices_cache[cache_key]
 
-        # 2. Lokal bazadan qidirish
+            try:
+                flights = travelpayouts_api.search_flights(origin, dest, date)
+                if flights:
+                    cheapest = min(flights, key=lambda x: x['price'])
+                    result = {
+                        'price': cheapest['price'],
+                        'airline': cheapest.get('airline', 'Aviakompaniya'),
+                        'duration': cheapest.get('duration', 240),
+                        'data_source': 'live_api',
+                        'link': cheapest.get('link', ''),
+                    }
+                    self._live_prices_cache[cache_key] = result
+                    logger.info(f"Live API: {origin}->{dest} = ${cheapest['price']}")
+                    return result
+            except Exception as e:
+                logger.warning(f"Live API xatosi: {e}")
+
+        # 1. Graf dan olish (eng tez - keshdan)
+        for neighbor, price, duration, airline in self.graph.get(origin, []):
+            if neighbor == dest:
+                return {'price': price, 'airline': airline, 'duration': duration, 'data_source': 'graph_cache'}
+
+        # 2. Lokal bazadan qidirish (aniq sana)
         flight = FlightPrice.objects.filter(
             origin__iata_code=origin,
             destination__iata_code=dest,
@@ -843,59 +838,45 @@ class RouteOptimizer:
             }
 
         # 3. O'rtacha narxni tekshirish
+        key = (origin, dest)
+        if key in self._avg_prices_cache:
+            return self._avg_prices_cache[key]
+
         avg_price = FlightPrice.objects.filter(
             origin__iata_code=origin,
             destination__iata_code=dest
         ).aggregate(avg=Avg('price_usd'))['avg']
 
         if avg_price:
-            return {'price': float(avg_price), 'airline': 'Aviakompaniya', 'duration': 240, 'data_source': 'database_avg'}
-
-        # 4. Graf dan olish
-        for neighbor, price, duration, airline in self.graph.get(origin, []):
-            if neighbor == dest:
-                return {'price': price, 'airline': airline, 'duration': duration, 'data_source': 'estimated'}
+            result = {'price': float(avg_price), 'airline': 'Aviakompaniya', 'duration': 240, 'data_source': 'database_avg'}
+            self._avg_prices_cache[key] = result
+            return result
 
         return {'price': 200, 'airline': 'Aviakompaniya', 'duration': 240, 'data_source': 'fallback'}
 
     def _get_hotel_cost(self, city_code: str, nights: int) -> Decimal:
-        """Mehmonxona narxini olish - Real API yoki bazadan"""
+        """Mehmonxona narxini olish - Faqat lokal bazadan (tez)"""
         if nights <= 0:
             return Decimal('0')
 
-        city = self.cities.get(city_code)
-        city_name = city.name if city else city_code
+        # 1. Keshdan tekshirish
+        cache_key = (city_code, self.hotel_stars)
+        if hasattr(self, '_hotel_cache') and cache_key in self._hotel_cache:
+            return self._hotel_cache[cache_key] * nights
 
-        # 1. Real API dan olishga urinish (Booking.com)
-        if booking_api.is_configured():
-            try:
-                checkin = self.departure_date
-                checkout = checkin + timedelta(days=nights)
-                hotel_data = booking_api.get_cheapest_hotel(
-                    city_name,
-                    checkin,
-                    checkout,
-                    min_stars=self.hotel_stars
-                )
-                if hotel_data:
-                    price_per_night = hotel_data['price_per_night']
-                    logger.info(f"Booking.com: {city_name} {self.hotel_stars}* = ${price_per_night}/kecha")
-                    return Decimal(str(price_per_night)) * nights
-            except Exception as e:
-                logger.error(f"Booking.com API xatosi: {e}")
+        # 2. Lokal bazadan qidirish
+        hotel = HotelPrice.objects.filter(
+            city__iata_code=city_code,
+            stars__gte=self.hotel_stars
+        ).order_by('price_per_night_usd').first()
 
-        # 2. Lokal bazadan qidirish (faqat 3+ yulduzli mehmonxonalar uchun)
-        if self.hotel_stars >= 3:
-            hotel = HotelPrice.objects.filter(
-                city__iata_code=city_code,
-                stars__gte=self.hotel_stars
-            ).order_by('price_per_night_usd').first()
-
-            if hotel:
-                return hotel.price_per_night_usd * nights
+        if hotel:
+            if not hasattr(self, '_hotel_cache'):
+                self._hotel_cache = {}
+            self._hotel_cache[cache_key] = hotel.price_per_night_usd
+            return hotel.price_per_night_usd * nights
 
         # 3. Taxminiy narxlar (hostel va mehmonxona turlari bo'yicha)
-        # Shahar bo'yicha taxminiy narxlar (1=hostel, 2-5=yulduzli)
         fallback_prices = {
             'IST': {1: 15, 2: 30, 3: 55, 4: 95, 5: 180},
             'DXB': {1: 20, 2: 35, 3: 45, 4: 85, 5: 200},
@@ -910,7 +891,9 @@ class RouteOptimizer:
         city_fallback = fallback_prices.get(city_code, {1: 15, 2: 30, 3: 50, 4: 100, 5: 200})
         price_per_night = city_fallback.get(self.hotel_stars, 50)
 
-        logger.info(f"Fallback hotel: {city_code} {self.hotel_stars}* = ${price_per_night}/kecha")
+        if not hasattr(self, '_hotel_cache'):
+            self._hotel_cache = {}
+        self._hotel_cache[cache_key] = Decimal(str(price_per_night))
         return Decimal(str(price_per_night)) * nights
 
     def _get_city_name(self, code: str) -> str:

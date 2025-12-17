@@ -28,6 +28,7 @@ function SearchForm({ compact = false }) {
   const [hotelStars, setHotelStars] = useState(3)
   const [optimizationMode, setOptimizationMode] = useState('balanced')
   const [budgetMax, setBudgetMax] = useState('')
+  const [useLivePrices, setUseLivePrices] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
 
   const handleSubmit = async (e) => {
@@ -54,6 +55,7 @@ function SearchForm({ compact = false }) {
         optimization_mode: optimizationMode,
         budget_max: budgetMax ? parseFloat(budgetMax) : null,
         use_optimizer: true,
+        use_live_prices: useLivePrices,
       }
 
       const results = await searchApi.createSearch(searchData)
@@ -202,6 +204,27 @@ function SearchForm({ compact = false }) {
                 <span className="ml-2 text-gray-700">Tranzit variantlarni ko'rsatish</span>
               </label>
             </div>
+          </div>
+
+          {/* Real vaqtdagi narxlar */}
+          <div className="flex items-center justify-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useLivePrices}
+                onChange={(e) => setUseLivePrices(e.target.checked)}
+                className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="ml-3 text-gray-700 font-medium">
+                <span className="text-blue-600">Real vaqtdagi narxlar</span>
+                <span className="text-gray-500 text-sm ml-2">(Aviasales.uz dan)</span>
+              </span>
+              {useLivePrices && (
+                <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full">
+                  Sekinroq
+                </span>
+              )}
+            </label>
           </div>
         </>
       )}

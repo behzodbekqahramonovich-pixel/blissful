@@ -53,10 +53,11 @@ class TravelSearchViewSet(viewsets.ModelViewSet):
         # Optimallashtirish rejimini olish
         optimization_mode = request.data.get('optimization_mode', 'balanced')
         use_optimizer = request.data.get('use_optimizer', True)
+        use_live_prices = request.data.get('use_live_prices', False)
 
         if use_optimizer:
             # Yangi ilg'or optimizer ishlatish
-            optimizer = RouteOptimizer(search)
+            optimizer = RouteOptimizer(search, use_live_prices=use_live_prices)
             variants = optimizer.find_optimal_route(mode=optimization_mode)
             saved_variants = optimizer.save_variants(variants)
         else:
@@ -78,7 +79,8 @@ class TravelSearchViewSet(viewsets.ModelViewSet):
             'optimization': {
                 'mode': optimization_mode,
                 'available_modes': ['cheapest', 'fastest', 'balanced', 'comfort']
-            }
+            },
+            'live_prices': use_live_prices
         }
 
         return Response(result, status=status.HTTP_201_CREATED)

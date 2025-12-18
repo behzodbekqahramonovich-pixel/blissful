@@ -16,6 +16,7 @@ from decimal import Decimal
 from datetime import timedelta, datetime
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.db.models import Min, Avg, Q
 from apps.destinations.models import City
 from apps.pricing.models import FlightPrice, HotelPrice
@@ -23,6 +24,9 @@ from apps.search.models import TravelSearch, RouteVariant
 from services.external_apis import travelpayouts_api, booking_api
 
 logger = logging.getLogger(__name__)
+
+# Parallel API chaqiruvlar uchun thread pool
+MAX_WORKERS = 10  # Bir vaqtda maksimum API chaqiruvlar soni
 
 
 @dataclass
@@ -86,6 +90,10 @@ class RouteOptimizer:
         # Graf tuzish
         self._build_flight_graph()
 
+        # Parallel API prefetch (agar live prices yoqilgan bo'lsa)
+        if self.use_live_prices:
+            self._prefetch_flight_prices_parallel()
+
     def _build_flight_graph(self):
         """Parvozlar grafini tuzish"""
         self.graph = {}  # {origin: [(dest, price, duration, airline), ...]}
@@ -122,10 +130,11 @@ class RouteOptimizer:
 
     def _add_estimated_routes(self):
         """Taxminiy marshrutlarni qo'shish"""
-        hubs = ['DXB', 'IST', 'DOH', 'AUH', 'BKK', 'KUL', 'SIN']
-        major_cities = ['TAS', 'CAI'] + hubs
+        hubs = ['DXB', 'IST', 'DOH', 'AUH', 'BKK', 'KUL', 'SIN', 'JFK', 'LHR', 'CDG', 'FRA', 'AMS']
+        major_cities = ['TAS', 'CAI', 'HND', 'ICN', 'PEK', 'PVG', 'HKG', 'SYD', 'MAD', 'FCO', 'YYZ', 'LAX', 'ORD', 'MEX'] + hubs
 
         estimated_prices = {
+            # O'zbekistondan (TAS)
             ('TAS', 'IST'): (250, 300),
             ('TAS', 'DXB'): (200, 270),
             ('TAS', 'DOH'): (220, 300),
@@ -133,24 +142,196 @@ class RouteOptimizer:
             ('TAS', 'KUL'): (400, 480),
             ('TAS', 'SIN'): (450, 540),
             ('TAS', 'CAI'): (300, 360),
+            ('TAS', 'JFK'): (650, 900),
+            ('TAS', 'LHR'): (450, 600),
+            ('TAS', 'CDG'): (480, 600),
+            ('TAS', 'FRA'): (420, 540),
+            ('TAS', 'AMS'): (450, 570),
+            ('TAS', 'HND'): (550, 720),
+            ('TAS', 'ICN'): (500, 660),
+            ('TAS', 'PEK'): (380, 480),
+            ('TAS', 'PVG'): (400, 510),
+            ('TAS', 'HKG'): (480, 600),
+            ('TAS', 'SYD'): (800, 1080),
+            ('TAS', 'MAD'): (500, 630),
+            ('TAS', 'FCO'): (480, 600),
+            ('TAS', 'YYZ'): (700, 960),
+            ('TAS', 'LAX'): (750, 1020),
+            ('TAS', 'ORD'): (680, 900),
+            ('TAS', 'MEX'): (850, 1140),
+
+            # Dubaydan (DXB)
             ('DXB', 'IST'): (150, 180),
             ('DXB', 'DOH'): (80, 90),
             ('DXB', 'BKK'): (250, 360),
             ('DXB', 'KUL'): (280, 360),
             ('DXB', 'SIN'): (300, 360),
             ('DXB', 'CAI'): (180, 240),
+            ('DXB', 'JFK'): (550, 840),
+            ('DXB', 'LHR'): (350, 480),
+            ('DXB', 'CDG'): (380, 510),
+            ('DXB', 'FRA'): (350, 480),
+            ('DXB', 'AMS'): (380, 510),
+            ('DXB', 'HND'): (500, 720),
+            ('DXB', 'ICN'): (480, 660),
+            ('DXB', 'PEK'): (450, 600),
+            ('DXB', 'PVG'): (480, 630),
+            ('DXB', 'HKG'): (400, 540),
+            ('DXB', 'SYD'): (650, 900),
+            ('DXB', 'MAD'): (350, 480),
+            ('DXB', 'FCO'): (320, 450),
+            ('DXB', 'YYZ'): (600, 840),
+            ('DXB', 'LAX'): (650, 900),
+            ('DXB', 'ORD'): (580, 810),
+            ('DXB', 'MEX'): (750, 1020),
+
+            # Istanbuldan (IST)
             ('IST', 'DOH'): (160, 210),
             ('IST', 'BKK'): (350, 540),
             ('IST', 'KUL'): (400, 540),
             ('IST', 'SIN'): (420, 540),
             ('IST', 'CAI'): (120, 150),
+            ('IST', 'JFK'): (450, 660),
+            ('IST', 'LHR'): (150, 210),
+            ('IST', 'CDG'): (150, 210),
+            ('IST', 'FRA'): (130, 180),
+            ('IST', 'AMS'): (160, 210),
+            ('IST', 'HND'): (550, 780),
+            ('IST', 'ICN'): (500, 720),
+            ('IST', 'PEK'): (450, 660),
+            ('IST', 'PVG'): (480, 690),
+            ('IST', 'HKG'): (450, 660),
+            ('IST', 'SYD'): (750, 1080),
+            ('IST', 'MAD'): (150, 210),
+            ('IST', 'FCO'): (120, 180),
+            ('IST', 'YYZ'): (500, 720),
+            ('IST', 'LAX'): (550, 780),
+            ('IST', 'ORD'): (480, 690),
+            ('IST', 'MEX'): (650, 900),
+
+            # Dohadan (DOH)
             ('DOH', 'BKK'): (280, 390),
             ('DOH', 'KUL'): (300, 420),
             ('DOH', 'SIN'): (320, 420),
             ('DOH', 'CAI'): (150, 180),
+            ('DOH', 'JFK'): (550, 810),
+            ('DOH', 'LHR'): (350, 480),
+            ('DOH', 'CDG'): (380, 510),
+            ('DOH', 'FRA'): (350, 480),
+            ('DOH', 'HND'): (500, 720),
+            ('DOH', 'ICN'): (480, 660),
+            ('DOH', 'SYD'): (650, 900),
+
+            # Bangkokdan (BKK)
             ('BKK', 'KUL'): (80, 120),
             ('BKK', 'SIN'): (100, 150),
+            ('BKK', 'HND'): (280, 390),
+            ('BKK', 'ICN'): (250, 360),
+            ('BKK', 'PEK'): (300, 420),
+            ('BKK', 'PVG'): (280, 390),
+            ('BKK', 'HKG'): (180, 270),
+            ('BKK', 'SYD'): (400, 570),
+
+            # Kuala-Lumpurdan (KUL)
             ('KUL', 'SIN'): (50, 60),
+            ('KUL', 'HND'): (350, 480),
+            ('KUL', 'ICN'): (320, 450),
+            ('KUL', 'PEK'): (350, 480),
+            ('KUL', 'HKG'): (200, 300),
+            ('KUL', 'SYD'): (350, 510),
+
+            # Singapurdan (SIN)
+            ('SIN', 'HND'): (350, 480),
+            ('SIN', 'ICN'): (300, 420),
+            ('SIN', 'PEK'): (380, 510),
+            ('SIN', 'HKG'): (200, 270),
+            ('SIN', 'SYD'): (300, 450),
+
+            # Londondan (LHR)
+            ('LHR', 'JFK'): (350, 480),
+            ('LHR', 'CDG'): (80, 120),
+            ('LHR', 'FRA'): (80, 120),
+            ('LHR', 'AMS'): (80, 120),
+            ('LHR', 'MAD'): (100, 150),
+            ('LHR', 'FCO'): (100, 150),
+            ('LHR', 'YYZ'): (400, 540),
+            ('LHR', 'LAX'): (450, 600),
+            ('LHR', 'ORD'): (400, 540),
+            ('LHR', 'HND'): (550, 780),
+            ('LHR', 'HKG'): (500, 720),
+            ('LHR', 'SYD'): (700, 1020),
+
+            # Parijdan (CDG)
+            ('CDG', 'JFK'): (380, 510),
+            ('CDG', 'FRA'): (80, 120),
+            ('CDG', 'AMS'): (80, 120),
+            ('CDG', 'MAD'): (100, 150),
+            ('CDG', 'FCO'): (100, 150),
+            ('CDG', 'YYZ'): (420, 570),
+            ('CDG', 'LAX'): (480, 630),
+            ('CDG', 'HND'): (580, 810),
+
+            # Frankfurtdan (FRA)
+            ('FRA', 'JFK'): (380, 510),
+            ('FRA', 'AMS'): (80, 120),
+            ('FRA', 'MAD'): (120, 180),
+            ('FRA', 'FCO'): (100, 150),
+            ('FRA', 'YYZ'): (400, 540),
+            ('FRA', 'LAX'): (480, 630),
+            ('FRA', 'HND'): (550, 780),
+            ('FRA', 'PEK'): (480, 660),
+
+            # Nyu-Yorkdan (JFK)
+            ('JFK', 'LAX'): (200, 330),
+            ('JFK', 'ORD'): (150, 240),
+            ('JFK', 'YYZ'): (150, 240),
+            ('JFK', 'MEX'): (300, 420),
+            ('JFK', 'MAD'): (350, 480),
+            ('JFK', 'FCO'): (380, 510),
+            ('JFK', 'HND'): (700, 960),
+            ('JFK', 'ICN'): (650, 900),
+            ('JFK', 'PEK'): (600, 840),
+            ('JFK', 'HKG'): (650, 900),
+
+            # Los-Anjelesdan (LAX)
+            ('LAX', 'ORD'): (150, 270),
+            ('LAX', 'YYZ'): (250, 360),
+            ('LAX', 'MEX'): (200, 300),
+            ('LAX', 'HND'): (500, 720),
+            ('LAX', 'ICN'): (480, 660),
+            ('LAX', 'PEK'): (500, 690),
+            ('LAX', 'HKG'): (550, 750),
+            ('LAX', 'SYD'): (600, 870),
+
+            # Tokiodan (HND)
+            ('HND', 'ICN'): (150, 180),
+            ('HND', 'PEK'): (250, 330),
+            ('HND', 'PVG'): (220, 300),
+            ('HND', 'HKG'): (280, 390),
+            ('HND', 'SYD'): (500, 720),
+
+            # Seuldan (ICN)
+            ('ICN', 'PEK'): (180, 240),
+            ('ICN', 'PVG'): (180, 240),
+            ('ICN', 'HKG'): (280, 390),
+
+            # Pekindan (PEK)
+            ('PEK', 'PVG'): (120, 150),
+            ('PEK', 'HKG'): (250, 330),
+
+            # Shanxaydan (PVG)
+            ('PVG', 'HKG'): (200, 270),
+
+            # Gonkongdan (HKG)
+            ('HKG', 'SYD'): (450, 630),
+
+            # Madriddan (MAD)
+            ('MAD', 'FCO'): (80, 120),
+            ('MAD', 'MEX'): (450, 630),
+
+            # Torontodan (YYZ)
+            ('YYZ', 'ORD'): (150, 210),
+            ('YYZ', 'MEX'): (350, 480),
         }
 
         for (origin, dest), (price, duration) in estimated_prices.items():
@@ -163,6 +344,79 @@ class RouteOptimizer:
                 existing = [x for x in self.graph[dest] if x[0] == origin]
                 if not existing:
                     self.graph[dest].append((origin, price, duration, 'Estimated'))
+
+    def _prefetch_flight_prices_parallel(self):
+        """Barcha kerakli yo'nalishlar uchun narxlarni parallel olish"""
+        import time
+        start_time = time.time()
+
+        # Kerakli yo'nalishlarni aniqlash
+        routes_to_fetch = set()
+        origin_code = self.origin.iata_code
+        dest_code = self.destination.iata_code
+
+        # Asosiy yo'nalishlar
+        routes_to_fetch.add((origin_code, dest_code, self.departure_date))
+        routes_to_fetch.add((dest_code, origin_code, self.return_date))
+
+        # Tranzit hublar orqali yo'nalishlar
+        popular_hubs = ['IST', 'DXB', 'DOH', 'FRA', 'LHR', 'CDG', 'FCO', 'AMS', 'VIE', 'SVO']
+        for hub in popular_hubs:
+            if hub != origin_code and hub != dest_code:
+                # Origin -> Hub
+                routes_to_fetch.add((origin_code, hub, self.departure_date))
+                # Hub -> Destination
+                hub_departure = self.departure_date + timedelta(days=max(1, self.nights // 3))
+                routes_to_fetch.add((hub, dest_code, hub_departure))
+
+        # Multi-city hublar
+        multi_hubs = [
+            ('DXB', 'BKK'), ('DOH', 'BKK'), ('IST', 'CAI'),
+            ('DXB', 'KUL'), ('DOH', 'SIN'), ('IST', 'BKK')
+        ]
+        for hub1, hub2 in multi_hubs:
+            if hub1 != origin_code and hub2 != dest_code:
+                routes_to_fetch.add((origin_code, hub1, self.departure_date))
+                hub1_dep = self.departure_date + timedelta(days=max(1, self.nights // 4))
+                routes_to_fetch.add((hub1, hub2, hub1_dep))
+                hub2_dep = hub1_dep + timedelta(days=max(1, self.nights // 4))
+                routes_to_fetch.add((hub2, dest_code, hub2_dep))
+
+        logger.info(f"Prefetch: {len(routes_to_fetch)} ta yo'nalish parallel yuklanmoqda...")
+
+        # Parallel API chaqiruvlar
+        def fetch_price(route_info):
+            origin, dest, dep_date = route_info
+            try:
+                flights = travelpayouts_api.search_flights(origin, dest, dep_date, use_cache=True)
+                if flights:
+                    cheapest = min(flights, key=lambda x: x['price'])
+                    return (origin, dest, str(dep_date), {
+                        'price': cheapest['price'],
+                        'airline': cheapest.get('airline', 'Aviakompaniya'),
+                        'duration': cheapest.get('duration', 240),
+                        'data_source': 'live_api',
+                        'link': cheapest.get('link', ''),
+                    })
+            except Exception as e:
+                logger.warning(f"Prefetch xatosi {origin}->{dest}: {e}")
+            return None
+
+        # ThreadPoolExecutor bilan parallel bajarish
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {executor.submit(fetch_price, route): route for route in routes_to_fetch}
+
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    origin, dest, dep_date, data = result
+                    cache_key = (origin, dest, dep_date)
+                    # Vaqtlarni qo'shish
+                    data.update(self._generate_flight_times(origin, dest, data['duration']))
+                    self._live_prices_cache[cache_key] = data
+
+        elapsed = time.time() - start_time
+        logger.info(f"Prefetch yakunlandi: {len(self._live_prices_cache)} ta narx, {elapsed:.2f}s")
 
     def find_optimal_route(self, mode: str = MODE_BALANCED) -> List[Dict]:
         """Optimal marshrutni topish"""
@@ -291,6 +545,11 @@ class RouteOptimizer:
             dest_code = path[i + 1]
 
             flight_info = self._get_flight_info(origin_code, dest_code, current_date)
+
+            # Real narx topilmasa, None qaytarish
+            if not flight_info:
+                return None
+
             segment = {
                 'from': origin_code,
                 'from_name': self._get_city_name(origin_code),
@@ -303,6 +562,9 @@ class RouteOptimizer:
                 'type': 'outbound' if i == 0 else 'transit',
                 'data_source': flight_info.get('data_source', 'unknown'),
                 'link': flight_info.get('link', ''),
+                'departure_time': flight_info.get('departure_time', '08:00'),
+                'arrival_time': flight_info.get('arrival_time', '12:00'),
+                'flight_number': flight_info.get('flight_number', ''),
             }
             segments.append(segment)
             total_flight_cost += flight_info['price']
@@ -318,6 +580,11 @@ class RouteOptimizer:
             self.origin.iata_code,
             self.return_date
         )
+
+        # Real narx topilmasa, None qaytarish
+        if not return_flight:
+            return None
+
         segments.append({
             'from': self.destination.iata_code,
             'from_name': self._get_city_name(self.destination.iata_code),
@@ -330,6 +597,9 @@ class RouteOptimizer:
             'type': 'inbound',
             'data_source': return_flight.get('data_source', 'unknown'),
             'link': return_flight.get('link', ''),
+            'departure_time': return_flight.get('departure_time', '10:00'),
+            'arrival_time': return_flight.get('arrival_time', '14:00'),
+            'flight_number': return_flight.get('flight_number', ''),
         })
         total_flight_cost += return_flight['price']
         total_duration += return_flight['duration']
@@ -437,6 +707,10 @@ class RouteOptimizer:
             self.return_date
         )
 
+        # Real narx topilmasa, None qaytarish
+        if not outbound or not inbound:
+            return None
+
         hotel_cost = self._get_hotel_cost(self.destination.iata_code, self.nights)
 
         total_flight = (outbound['price'] + inbound['price']) * self.travelers
@@ -468,6 +742,9 @@ class RouteOptimizer:
                         'type': 'outbound',
                         'data_source': outbound.get('data_source', 'unknown'),
                         'link': outbound.get('link', ''),
+                        'departure_time': outbound.get('departure_time', '08:00'),
+                        'arrival_time': outbound.get('arrival_time', '12:00'),
+                        'flight_number': outbound.get('flight_number', ''),
                     },
                     {
                         'from': self.destination.iata_code,
@@ -481,6 +758,9 @@ class RouteOptimizer:
                         'type': 'inbound',
                         'data_source': inbound.get('data_source', 'unknown'),
                         'link': inbound.get('link', ''),
+                        'departure_time': inbound.get('departure_time', '10:00'),
+                        'arrival_time': inbound.get('arrival_time', '14:00'),
+                        'flight_number': inbound.get('flight_number', ''),
                     }
                 ],
                 'hotels': [{
@@ -541,6 +821,10 @@ class RouteOptimizer:
         seg2 = self._get_flight_info(hub_code, self.destination.iata_code, hub_departure)
         seg3 = self._get_flight_info(self.destination.iata_code, self.origin.iata_code, self.return_date)
 
+        # Real narx topilmasa, None qaytarish
+        if not seg1 or not seg2 or not seg3:
+            return None
+
         # Mehmonxonalar
         hub_hotel = self._get_hotel_cost(hub_code, nights_at_hub)
         dest_hotel = self._get_hotel_cost(self.destination.iata_code, dest_nights)
@@ -575,6 +859,9 @@ class RouteOptimizer:
                         'type': 'outbound',
                         'data_source': seg1.get('data_source', 'unknown'),
                         'link': seg1.get('link', ''),
+                        'departure_time': seg1.get('departure_time', '06:00'),
+                        'arrival_time': seg1.get('arrival_time', '10:00'),
+                        'flight_number': seg1.get('flight_number', ''),
                     },
                     {
                         'from': hub_code,
@@ -588,6 +875,9 @@ class RouteOptimizer:
                         'type': 'transit',
                         'data_source': seg2.get('data_source', 'unknown'),
                         'link': seg2.get('link', ''),
+                        'departure_time': seg2.get('departure_time', '14:00'),
+                        'arrival_time': seg2.get('arrival_time', '18:00'),
+                        'flight_number': seg2.get('flight_number', ''),
                     },
                     {
                         'from': self.destination.iata_code,
@@ -601,6 +891,9 @@ class RouteOptimizer:
                         'type': 'inbound',
                         'data_source': seg3.get('data_source', 'unknown'),
                         'link': seg3.get('link', ''),
+                        'departure_time': seg3.get('departure_time', '10:00'),
+                        'arrival_time': seg3.get('arrival_time', '14:00'),
+                        'flight_number': seg3.get('flight_number', ''),
                     }
                 ],
                 'hotels': [
@@ -660,10 +953,15 @@ class RouteOptimizer:
     def _estimate_multi_city_cost(self, hub1: str, hub2: str) -> float:
         """Ko'p shaharli marshrut narxini taxmin qilish"""
         cost = 0
-        cost += self._get_flight_info(self.origin.iata_code, hub1, self.departure_date)['price']
-        cost += self._get_flight_info(hub1, hub2, self.departure_date)['price']
-        cost += self._get_flight_info(hub2, self.destination.iata_code, self.departure_date)['price']
-        cost += self._get_flight_info(self.destination.iata_code, self.origin.iata_code, self.return_date)['price']
+        seg1 = self._get_flight_info(self.origin.iata_code, hub1, self.departure_date)
+        seg2 = self._get_flight_info(hub1, hub2, self.departure_date)
+        seg3 = self._get_flight_info(hub2, self.destination.iata_code, self.departure_date)
+        seg4 = self._get_flight_info(self.destination.iata_code, self.origin.iata_code, self.return_date)
+
+        if not seg1 or not seg2 or not seg3 or not seg4:
+            return float('inf')  # Juda katta narx qaytarish
+
+        cost = seg1['price'] + seg2['price'] + seg3['price'] + seg4['price']
         return cost
 
     def _calculate_multi_city_variant(self, hub1: str, hub2: str) -> Optional[Dict]:
@@ -683,6 +981,10 @@ class RouteOptimizer:
         hub2_departure = hub1_departure + timedelta(days=nights_per_city)
         seg3 = self._get_flight_info(hub2, self.destination.iata_code, hub2_departure)
         seg4 = self._get_flight_info(self.destination.iata_code, self.origin.iata_code, self.return_date)
+
+        # Real narx topilmasa, None qaytarish
+        if not seg1 or not seg2 or not seg3 or not seg4:
+            return None
 
         # Mehmonxonalar
         hub1_hotel = self._get_hotel_cost(hub1, nights_per_city)
@@ -719,6 +1021,9 @@ class RouteOptimizer:
                         'type': 'outbound',
                         'data_source': seg1.get('data_source', 'unknown'),
                         'link': seg1.get('link', ''),
+                        'departure_time': seg1.get('departure_time', '06:00'),
+                        'arrival_time': seg1.get('arrival_time', '10:00'),
+                        'flight_number': seg1.get('flight_number', ''),
                     },
                     {
                         'from': hub1,
@@ -732,6 +1037,9 @@ class RouteOptimizer:
                         'type': 'transit',
                         'data_source': seg2.get('data_source', 'unknown'),
                         'link': seg2.get('link', ''),
+                        'departure_time': seg2.get('departure_time', '11:00'),
+                        'arrival_time': seg2.get('arrival_time', '14:00'),
+                        'flight_number': seg2.get('flight_number', ''),
                     },
                     {
                         'from': hub2,
@@ -745,6 +1053,9 @@ class RouteOptimizer:
                         'type': 'transit',
                         'data_source': seg3.get('data_source', 'unknown'),
                         'link': seg3.get('link', ''),
+                        'departure_time': seg3.get('departure_time', '15:00'),
+                        'arrival_time': seg3.get('arrival_time', '19:00'),
+                        'flight_number': seg3.get('flight_number', ''),
                     },
                     {
                         'from': self.destination.iata_code,
@@ -758,6 +1069,9 @@ class RouteOptimizer:
                         'type': 'inbound',
                         'data_source': seg4.get('data_source', 'unknown'),
                         'link': seg4.get('link', ''),
+                        'departure_time': seg4.get('departure_time', '10:00'),
+                        'arrival_time': seg4.get('arrival_time', '14:00'),
+                        'flight_number': seg4.get('flight_number', ''),
                     }
                 ],
                 'hotels': [
@@ -796,6 +1110,15 @@ class RouteOptimizer:
 
         # 0. Real vaqtda narxlar (agar yoqilgan bo'lsa)
         if self.use_live_prices:
+            # Soddalashtirilgan cache key (sanasiz) - narx asosan yo'nalishga bog'liq
+            simple_key = (origin, dest)
+
+            # Avval sodda key bilan qidirish
+            for cached_key, cached_data in self._live_prices_cache.items():
+                if cached_key[0] == origin and cached_key[1] == dest:
+                    return cached_data
+
+            # Aniq sana bilan ham tekshirish
             cache_key = (origin, dest, str(date))
             if cache_key in self._live_prices_cache:
                 return self._live_prices_cache[cache_key]
@@ -811,8 +1134,9 @@ class RouteOptimizer:
                         'data_source': 'live_api',
                         'link': cheapest.get('link', ''),
                     }
+                    # Vaqtlarni qo'shish
+                    result.update(self._generate_flight_times(origin, dest, result['duration']))
                     self._live_prices_cache[cache_key] = result
-                    logger.info(f"Live API: {origin}->{dest} = ${cheapest['price']}")
                     return result
             except Exception as e:
                 logger.warning(f"Live API xatosi: {e}")
@@ -820,7 +1144,14 @@ class RouteOptimizer:
         # 1. Graf dan olish (eng tez - keshdan)
         for neighbor, price, duration, airline in self.graph.get(origin, []):
             if neighbor == dest:
-                return {'price': price, 'airline': airline, 'duration': duration, 'data_source': 'graph_cache'}
+                result = {
+                    'price': price,
+                    'airline': self._get_airline_for_route(origin, dest),
+                    'duration': duration,
+                    'data_source': 'graph_cache'
+                }
+                result.update(self._generate_flight_times(origin, dest, duration))
+                return result
 
         # 2. Lokal bazadan qidirish (aniq sana)
         flight = FlightPrice.objects.filter(
@@ -830,12 +1161,14 @@ class RouteOptimizer:
         ).order_by('price_usd').first()
 
         if flight:
-            return {
+            result = {
                 'price': float(flight.price_usd),
                 'airline': flight.airline,
                 'duration': flight.flight_duration_minutes,
                 'data_source': 'database',
             }
+            result.update(self._generate_flight_times(origin, dest, flight.flight_duration_minutes))
+            return result
 
         # 3. O'rtacha narxni tekshirish
         key = (origin, dest)
@@ -848,11 +1181,200 @@ class RouteOptimizer:
         ).aggregate(avg=Avg('price_usd'))['avg']
 
         if avg_price:
-            result = {'price': float(avg_price), 'airline': 'Aviakompaniya', 'duration': 240, 'data_source': 'database_avg'}
+            result = {
+                'price': float(avg_price),
+                'airline': self._get_airline_for_route(origin, dest),
+                'duration': 240,
+                'data_source': 'database_avg'
+            }
+            result.update(self._generate_flight_times(origin, dest, 240))
             self._avg_prices_cache[key] = result
             return result
 
-        return {'price': 200, 'airline': 'Aviakompaniya', 'duration': 240, 'data_source': 'fallback'}
+        # Fallback o'chirilgan - None qaytarish (real narx topilmadi)
+        return None
+
+    def _get_real_flight_duration(self, origin: str, dest: str) -> int:
+        """Haqiqiy parvoz davomiyligini olish (daqiqalarda)"""
+        # To'g'ridan-to'g'ri parvoz davomiyliklari (real ma'lumotlar asosida)
+        flight_durations = {
+            # O'zbekistondan
+            ('TAS', 'IST'): 270,   # 4.5 soat
+            ('TAS', 'DXB'): 210,   # 3.5 soat
+            ('TAS', 'DOH'): 240,   # 4 soat
+            ('TAS', 'SVO'): 240,   # 4 soat
+            ('TAS', 'LED'): 270,   # 4.5 soat
+            ('TAS', 'FRA'): 420,   # 7 soat
+            ('TAS', 'LHR'): 480,   # 8 soat
+            ('TAS', 'CDG'): 450,   # 7.5 soat
+            ('TAS', 'FCO'): 390,   # 6.5 soat
+            ('TAS', 'BKK'): 360,   # 6 soat
+            ('TAS', 'KUL'): 420,   # 7 soat
+            ('TAS', 'SIN'): 450,   # 7.5 soat
+            ('TAS', 'DEL'): 180,   # 3 soat
+            ('TAS', 'PEK'): 300,   # 5 soat
+            ('TAS', 'ICN'): 420,   # 7 soat
+            # Istanbuldan
+            ('IST', 'DXB'): 240,   # 4 soat
+            ('IST', 'DOH'): 210,   # 3.5 soat
+            ('IST', 'CAI'): 120,   # 2 soat
+            ('IST', 'LHR'): 240,   # 4 soat
+            ('IST', 'CDG'): 210,   # 3.5 soat
+            ('IST', 'FRA'): 180,   # 3 soat
+            ('IST', 'FCO'): 150,   # 2.5 soat
+            ('IST', 'BKK'): 540,   # 9 soat
+            ('IST', 'SIN'): 600,   # 10 soat
+            ('IST', 'JFK'): 660,   # 11 soat
+            # Dubaydan
+            ('DXB', 'IST'): 240,   # 4 soat
+            ('DXB', 'DOH'): 60,    # 1 soat
+            ('DXB', 'BKK'): 360,   # 6 soat
+            ('DXB', 'KUL'): 420,   # 7 soat
+            ('DXB', 'SIN'): 450,   # 7.5 soat
+            ('DXB', 'CAI'): 240,   # 4 soat
+            ('DXB', 'LHR'): 420,   # 7 soat
+            # Dohadan
+            ('DOH', 'IST'): 210,   # 3.5 soat
+            ('DOH', 'BKK'): 390,   # 6.5 soat
+            ('DOH', 'SIN'): 480,   # 8 soat
+            ('DOH', 'CAI'): 210,   # 3.5 soat
+            # Bangkokdan
+            ('BKK', 'KUL'): 120,   # 2 soat
+            ('BKK', 'SIN'): 150,   # 2.5 soat
+            ('BKK', 'HKG'): 180,   # 3 soat
+            # Kuala Lumpurdan
+            ('KUL', 'SIN'): 60,    # 1 soat
+            ('KUL', 'BKK'): 120,   # 2 soat
+            # Frankfurtdan
+            ('FRA', 'IST'): 180,   # 3 soat
+            ('FRA', 'DXB'): 360,   # 6 soat
+            # Londondan
+            ('LHR', 'IST'): 240,   # 4 soat
+            ('LHR', 'DXB'): 420,   # 7 soat
+            # Rimdan
+            ('FCO', 'IST'): 150,   # 2.5 soat
+        }
+
+        # To'g'ridan-to'g'ri qidirish
+        key = (origin, dest)
+        if key in flight_durations:
+            return flight_durations[key]
+
+        # Teskari yo'nalish
+        reverse_key = (dest, origin)
+        if reverse_key in flight_durations:
+            return flight_durations[reverse_key]
+
+        # Default: 240 daqiqa (4 soat)
+        return 240
+
+    def _generate_flight_times(self, origin: str, dest: str, api_duration: int) -> Dict:
+        """Parvoz vaqtlarini generatsiya qilish"""
+        import random
+
+        # Haqiqiy parvoz davomiyligini olish (API qiymati noto'g'ri bo'lishi mumkin)
+        duration = self._get_real_flight_duration(origin, dest)
+
+        # Uchish vaqtlari (odatiy parvoz vaqtlari)
+        departure_hours = [6, 7, 8, 9, 10, 11, 14, 15, 16, 18, 20]
+        dep_hour = random.choice(departure_hours)
+        dep_minute = random.choice([0, 15, 30, 45])
+
+        departure_time = f"{dep_hour:02d}:{dep_minute:02d}"
+
+        # Qo'nish vaqtini hisoblash
+        total_minutes = dep_hour * 60 + dep_minute + duration
+        arr_hour = (total_minutes // 60) % 24
+        arr_minute = total_minutes % 60
+        arrival_time = f"{arr_hour:02d}:{arr_minute:02d}"
+
+        # Duration ni ham qaytarish (to'g'rilangan)
+        corrected_duration = duration
+
+        # Reys raqami
+        airline_codes = {
+            'Turkish Airlines': 'TK',
+            'Emirates': 'EK',
+            'Qatar Airways': 'QR',
+            'Uzbekistan Airways': 'HY',
+            'Lufthansa': 'LH',
+            'British Airways': 'BA',
+            'Air France': 'AF',
+            'Aeroflot': 'SU',
+            'Singapore Airlines': 'SQ',
+            'ANA': 'NH',
+            'Korean Air': 'KE',
+        }
+        airline = self._get_airline_for_route(origin, dest)
+        code = airline_codes.get(airline, 'XX')
+        flight_number = f"{code}{random.randint(100, 999)}"
+
+        return {
+            'departure_time': departure_time,
+            'arrival_time': arrival_time,
+            'flight_number': flight_number,
+            'duration': corrected_duration,  # To'g'rilangan davomiylik
+        }
+
+    def _get_airline_for_route(self, origin: str, dest: str) -> str:
+        """Yo'nalish uchun aviakompaniyani aniqlash"""
+        # O'zbekistondan yoki O'zbekistonga
+        if origin == 'TAS' or dest == 'TAS':
+            if dest in ['IST', 'AYT'] or origin in ['IST', 'AYT']:
+                return 'Turkish Airlines'
+            if dest in ['DXB', 'AUH'] or origin in ['DXB', 'AUH']:
+                return 'Flydubai'
+            if dest == 'DOH' or origin == 'DOH':
+                return 'Qatar Airways'
+            if dest in ['SVO', 'LED'] or origin in ['SVO', 'LED']:
+                return 'Aeroflot'
+            if dest in ['JFK', 'LAX', 'ORD'] or origin in ['JFK', 'LAX', 'ORD']:
+                return 'Turkish Airlines'
+            if dest in ['LHR'] or origin in ['LHR']:
+                return 'Turkish Airlines'
+            if dest in ['CDG'] or origin in ['CDG']:
+                return 'Turkish Airlines'
+            if dest in ['FRA'] or origin in ['FRA']:
+                return 'Lufthansa'
+            return 'Uzbekistan Airways'
+
+        # Turkiyadan
+        if origin == 'IST' or dest == 'IST':
+            return 'Turkish Airlines'
+
+        # BAA dan
+        if origin in ['DXB', 'AUH'] or dest in ['DXB', 'AUH']:
+            return 'Emirates'
+
+        # Qatardan
+        if origin == 'DOH' or dest == 'DOH':
+            return 'Qatar Airways'
+
+        # Singapurdan
+        if origin == 'SIN' or dest == 'SIN':
+            return 'Singapore Airlines'
+
+        # Yaponiyadan
+        if origin == 'HND' or dest == 'HND':
+            return 'ANA'
+
+        # Koreyadan
+        if origin == 'ICN' or dest == 'ICN':
+            return 'Korean Air'
+
+        # Yevropadan
+        if origin in ['LHR'] or dest in ['LHR']:
+            return 'British Airways'
+        if origin in ['CDG'] or dest in ['CDG']:
+            return 'Air France'
+        if origin in ['FRA'] or dest in ['FRA']:
+            return 'Lufthansa'
+
+        # AQSh dan
+        if origin in ['JFK', 'LAX', 'ORD'] or dest in ['JFK', 'LAX', 'ORD']:
+            return 'American Airlines'
+
+        return 'Aviakompaniya'
 
     def _get_hotel_cost(self, city_code: str, nights: int) -> Decimal:
         """Mehmonxona narxini olish - Faqat lokal bazadan (tez)"""
@@ -878,6 +1400,7 @@ class RouteOptimizer:
 
         # 3. Taxminiy narxlar (hostel va mehmonxona turlari bo'yicha)
         fallback_prices = {
+            # Mavjud shaharlar
             'IST': {1: 15, 2: 30, 3: 55, 4: 95, 5: 180},
             'DXB': {1: 20, 2: 35, 3: 45, 4: 85, 5: 200},
             'DOH': {1: 25, 2: 40, 3: 60, 4: 110, 5: 200},
@@ -886,6 +1409,29 @@ class RouteOptimizer:
             'SIN': {1: 25, 2: 45, 3: 70, 4: 150, 5: 300},
             'CAI': {1: 10, 2: 20, 3: 35, 4: 90, 5: 180},
             'TAS': {1: 12, 2: 25, 3: 40, 4: 70, 5: 120},
+            'AUH': {1: 22, 2: 38, 3: 50, 4: 90, 5: 210},
+            # Yangi shaharlar - Amerika
+            'JFK': {1: 40, 2: 80, 3: 150, 4: 250, 5: 450},
+            'LAX': {1: 35, 2: 70, 3: 130, 4: 220, 5: 400},
+            'ORD': {1: 30, 2: 60, 3: 110, 4: 180, 5: 320},
+            'YYZ': {1: 30, 2: 60, 3: 120, 4: 200, 5: 350},
+            'YVR': {1: 32, 2: 65, 3: 125, 4: 210, 5: 370},
+            'MEX': {1: 15, 2: 30, 3: 55, 4: 100, 5: 180},
+            # Yevropa
+            'LHR': {1: 35, 2: 70, 3: 130, 4: 220, 5: 400},
+            'CDG': {1: 30, 2: 60, 3: 120, 4: 200, 5: 380},
+            'FRA': {1: 28, 2: 55, 3: 100, 4: 170, 5: 300},
+            'AMS': {1: 30, 2: 60, 3: 110, 4: 190, 5: 350},
+            'MAD': {1: 20, 2: 40, 3: 80, 4: 140, 5: 260},
+            'FCO': {1: 22, 2: 45, 3: 85, 4: 150, 5: 280},
+            # Osiyo
+            'HND': {1: 30, 2: 55, 3: 100, 4: 180, 5: 350},
+            'ICN': {1: 20, 2: 40, 3: 75, 4: 140, 5: 280},
+            'PEK': {1: 15, 2: 30, 3: 60, 4: 120, 5: 250},
+            'PVG': {1: 18, 2: 35, 3: 70, 4: 130, 5: 270},
+            'HKG': {1: 30, 2: 55, 3: 100, 4: 180, 5: 350},
+            # Avstraliya
+            'SYD': {1: 35, 2: 70, 3: 130, 4: 220, 5: 400},
         }
 
         city_fallback = fallback_prices.get(city_code, {1: 15, 2: 30, 3: 50, 4: 100, 5: 200})

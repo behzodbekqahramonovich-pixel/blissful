@@ -347,3 +347,178 @@
   content: '|';
   animation: blink 1s infinite;
 }
+
+/* 3D Ikonka Stillari */
+.icon-3d {
+  display: inline-block;
+  text-shadow:
+    0 1px 0 rgba(255,255,255,0.4),
+    0 2px 2px rgba(0,0,0,0.2),
+    0 4px 4px rgba(0,0,0,0.15),
+    0 6px 6px rgba(0,0,0,0.1);
+  transform: perspective(100px) translateZ(0);
+  transition: all 0.3s ease;
+}
+
+.icon-3d:hover {
+  transform: perspective(100px) translateZ(5px) scale(1.15);
+  text-shadow:
+    0 2px 0 rgba(255,255,255,0.5),
+    0 4px 4px rgba(0,0,0,0.25),
+    0 8px 8px rgba(0,0,0,0.2),
+    0 12px 12px rgba(0,0,0,0.15);
+}
+
+/* 3D ikonka - kichik o'lcham */
+.icon-3d-sm {
+  display: inline-block;
+  text-shadow:
+    0 1px 0 rgba(255,255,255,0.3),
+    0 1px 1px rgba(0,0,0,0.15),
+    0 2px 2px rgba(0,0,0,0.1);
+  transform: perspective(80px) translateZ(0);
+  transition: all 0.25s ease;
+}
+
+.icon-3d-sm:hover {
+  transform: perspective(80px) translateZ(3px) scale(1.1);
+  text-shadow:
+    0 1px 0 rgba(255,255,255,0.4),
+    0 2px 2px rgba(0,0,0,0.2),
+    0 4px 4px rgba(0,0,0,0.15);
+}
+
+/* 3D ikonka - katta o'lcham */
+.icon-3d-lg {
+  display: inline-block;
+  text-shadow:
+    0 2px 0 rgba(255,255,255,0.5),
+    0 4px 4px rgba(0,0,0,0.25),
+    0 8px 8px rgba(0,0,0,0.2),
+    0 12px 12px rgba(0,0,0,0.15);
+  transform: perspective(120px) translateZ(0);
+  transition: all 0.35s ease;
+}
+
+.icon-3d-lg:hover {
+  transform: perspective(120px) translateZ(8px) scale(1.2);
+  text-shadow:
+    0 3px 0 rgba(255,255,255,0.6),
+    0 6px 6px rgba(0,0,0,0.3),
+    0 12px 12px rgba(0,0,0,0.25),
+    0 18px 18px rgba(0,0,0,0.2);
+}
+
+/* 3D ikonka - rang bilan */
+.icon-3d-primary {
+  display: inline-block;
+  filter: drop-shadow(0 2px 2px rgba(99, 102, 241, 0.3))
+          drop-shadow(0 4px 4px rgba(99, 102, 241, 0.2));
+  transform: perspective(100px) translateZ(0);
+  transition: all 0.3s ease;
+}
+
+.icon-3d-primary:hover {
+  filter: drop-shadow(0 4px 4px rgba(99, 102, 241, 0.4))
+          drop-shadow(0 8px 8px rgba(99, 102, 241, 0.3));
+  transform: perspective(100px) translateZ(5px) scale(1.15);
+}
+
+/* 3D ikonka - yashil accent */
+.icon-3d-success {
+  display: inline-block;
+  filter: drop-shadow(0 2px 2px rgba(34, 197, 94, 0.3))
+          drop-shadow(0 4px 4px rgba(34, 197, 94, 0.2));
+  transform: perspective(100px) translateZ(0);
+  transition: all 0.3s ease;
+}
+
+.icon-3d-success:hover {
+  filter: drop-shadow(0 4px 4px rgba(34, 197, 94, 0.4))
+          drop-shadow(0 8px 8px rgba(34, 197, 94, 0.3));
+  transform: perspective(100px) translateZ(5px) scale(1.15);
+}
+
+/* 3D ikonka - sariq accent */
+.icon-3d-warning {
+  display: inline-block;
+  filter: drop-shadow(0 2px 2px rgba(234, 179, 8, 0.3))
+          drop-shadow(0 4px 4px rgba(234, 179, 8, 0.2));
+  transform: perspective(100px) translateZ(0);
+  transition: all 0.3s ease;
+}
+
+.icon-3d-warning:hover {
+  filter: drop-shadow(0 4px 4px rgba(234, 179, 8, 0.4))
+          drop-shadow(0 8px 8px rgba(234, 179, 8, 0.3));
+  transform: perspective(100px) translateZ(5px) scale(1.15);
+}
+
+/* 3D ikonka - binafsha accent */
+.icon-3d-purple {
+  display: inline-block;
+  filter: drop-shadow(0 2px 2px rgba(147, 51, 234, 0.3))
+          drop-shadow(0 4px 4px rgba(147, 51, 234, 0.2));
+  transform: perspective(100px) translateZ(0);
+  transition: all 0.3s ease;
+}
+
+.icon-3d-purple:hover {
+  filter: drop-shadow(0 4px 4px rgba(147, 51, 234, 0.4))
+          drop-shadow(0 8px 8px rgba(147, 51, 234, 0.3));
+  transform: perspective(100px) translateZ(5px) scale(1.15);
+}
+
+/* 3D ikonka animatsiya - suzuvchi */
+@keyframes float3d {
+  0%, 100% {
+    transform: perspective(100px) translateZ(0) translateY(0);
+  }
+  50% {
+    transform: perspective(100px) translateZ(5px) translateY(-5px);
+  }
+}
+
+.icon-3d-float {
+  display: inline-block;
+  text-shadow:
+    0 2px 0 rgba(255,255,255,0.4),
+    0 4px 4px rgba(0,0,0,0.2),
+    0 8px 8px rgba(0,0,0,0.15);
+  animation: float3d 3s ease-in-out infinite;
+}
+
+/* 3D ikonka - aylanuvchi */
+@keyframes rotate3d {
+  0% {
+    transform: perspective(100px) rotateY(0deg);
+  }
+  100% {
+    transform: perspective(100px) rotateY(360deg);
+  }
+}
+
+.icon-3d-rotate:hover {
+  animation: rotate3d 0.8s ease-in-out;
+}
+
+/* 3D ikonka - pulsatsiya */
+@keyframes pulse3d {
+  0%, 100% {
+    transform: perspective(100px) translateZ(0) scale(1);
+    text-shadow:
+      0 2px 0 rgba(255,255,255,0.4),
+      0 4px 4px rgba(0,0,0,0.2);
+  }
+  50% {
+    transform: perspective(100px) translateZ(3px) scale(1.1);
+    text-shadow:
+      0 3px 0 rgba(255,255,255,0.5),
+      0 6px 6px rgba(0,0,0,0.25);
+  }
+}
+
+.icon-3d-pulse {
+  display: inline-block;
+  animation: pulse3d 2s ease-in-out infinite;
+}

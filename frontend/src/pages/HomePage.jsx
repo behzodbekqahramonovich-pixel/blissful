@@ -40,21 +40,21 @@ function HomePage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="card text-center">
-              <div className="text-4xl mb-4">💰</div>
+              <div className="text-4xl mb-4 icon-3d-lg icon-3d-float">💰</div>
               <h3 className="text-xl font-semibold mb-2">Tejamkor</h3>
               <p className="text-gray-600">
                 Tranzit variantlar orqali 15-30% gacha tejang
               </p>
             </div>
             <div className="card text-center">
-              <div className="text-4xl mb-4">🌍</div>
+              <div className="text-4xl mb-4 icon-3d-lg icon-3d-float">🌍</div>
               <h3 className="text-xl font-semibold mb-2">Ko'p mamlakat</h3>
               <p className="text-gray-600">
                 Bitta sayohatda bir nechta mamlakatni ziyorat qiling
               </p>
             </div>
             <div className="card text-center">
-              <div className="text-4xl mb-4">🤖</div>
+              <div className="text-4xl mb-4 icon-3d-lg icon-3d-float">🤖</div>
               <h3 className="text-xl font-semibold mb-2">Aqlli algoritm</h3>
               <p className="text-gray-600">
                 AI yordamida eng optimal yo'nalishlarni topamiz

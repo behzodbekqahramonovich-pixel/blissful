@@ -7,11 +7,11 @@ function AdminLayout({ children }) {
   const { user, logout } = useAuthStore()
 
   const navItems = [
-    { path: '/admin', label: 'Dashboard', icon: '📊' },
-    { path: '/admin/countries', label: 'Mamlakatlar', icon: '🌍' },
-    { path: '/admin/cities', label: 'Shaharlar', icon: '🏙️' },
-    { path: '/admin/flights', label: 'Parvozlar', icon: '✈️' },
-    { path: '/admin/hotels', label: 'Mehmonxonalar', icon: '🏨' },
+    { path: '/admin', label: 'Dashboard', icon: '📊', iconClass: 'icon-3d-sm' },
+    { path: '/admin/countries', label: 'Mamlakatlar', icon: '🌍', iconClass: 'icon-3d-sm' },
+    { path: '/admin/cities', label: 'Shaharlar', icon: '🏙️', iconClass: 'icon-3d-sm' },
+    { path: '/admin/flights', label: 'Parvozlar', icon: '✈️', iconClass: 'icon-3d-sm' },
+    { path: '/admin/hotels', label: 'Mehmonxonalar', icon: '🏨', iconClass: 'icon-3d-sm' },
   ]
 
   const handleLogout = () => {
@@ -48,7 +48,7 @@ function AdminLayout({ children }) {
                   : 'text-gray-300 hover:bg-gray-800 hover:text-white'
               }`}
             >
-              <span className="text-lg">{item.icon}</span>
+              <span className={`text-lg ${item.iconClass}`}>{item.icon}</span>
               <span>{item.label}</span>
             </Link>
           ))}

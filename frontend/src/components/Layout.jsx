@@ -34,7 +34,7 @@ function Layout({ children }) {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-2">
-              <span className="text-2xl">✈️</span>
+              <span className="text-2xl icon-3d icon-3d-rotate">✈️</span>
               <span className="text-xl font-bold text-primary-600">
                 Blissful Tour
               </span>

@@ -33,8 +33,9 @@ class CityViewSet(viewsets.ReadOnlyModelViewSet):
         query = request.query_params.get('q', '')
         cities = self.get_queryset()
         if query:
-            cities = cities.filter(name_uz__icontains=query) | \
+            cities = cities.filter(name__icontains=query) | \
+                     cities.filter(name_uz__icontains=query) | \
                      cities.filter(iata_code__icontains=query)
-        cities = cities[:10]
+        cities = cities.distinct()[:10]
         serializer = CityMinimalSerializer(cities, many=True)
         return Response(serializer.data)

@@ -130,7 +130,7 @@ function SearchResultsPage() {
 
                 {parseFloat(activeVariant.savings_percent) > 0 && (
                   <div className="bg-green-100 rounded-lg p-3 text-center text-green-700">
-                    💰 ${parseFloat(activeVariant.savings_amount).toFixed(0)} tejaysiz!
+                    <span className="icon-3d-success">💰</span> ${parseFloat(activeVariant.savings_amount).toFixed(0)} tejaysiz!
                   </div>
                 )}
               </div>
@@ -146,7 +146,7 @@ function SearchResultsPage() {
                   onClick={handleSaveTrip}
                   className="btn btn-secondary w-full"
                 >
-                  💾 Sayohatni saqlash
+                  <span className="icon-3d-sm">💾</span> Sayohatni saqlash
                 </button>
               </div>
             </div>

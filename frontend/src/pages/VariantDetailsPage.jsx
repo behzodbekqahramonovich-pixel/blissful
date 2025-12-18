@@ -59,7 +59,7 @@ function VariantDetailsPage() {
           </div>
           {variant.is_recommended && (
             <span className="bg-green-500 text-white px-4 py-2 rounded-full font-medium">
-              ⭐ TAVSIYA ETILADI
+              <span className="icon-3d-sm">⭐</span> TAVSIYA ETILADI
             </span>
           )}
         </div>
@@ -76,7 +76,7 @@ function VariantDetailsPage() {
 
           {/* Parvozlar */}
           <div className="card">
-            <h2 className="text-xl font-semibold mb-4">✈️ Parvozlar</h2>
+            <h2 className="text-xl font-semibold mb-4"><span className="icon-3d">✈️</span> Parvozlar</h2>
             <div className="space-y-4">
               {details?.segments?.map((segment, index) => (
                 <FlightSegment key={index} segment={segment} />
@@ -86,7 +86,7 @@ function VariantDetailsPage() {
 
           {/* Mehmonxonalar */}
           <div className="card">
-            <h2 className="text-xl font-semibold mb-4">🏨 Mehmonxonalar</h2>
+            <h2 className="text-xl font-semibold mb-4"><span className="icon-3d">🏨</span> Mehmonxonalar</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {details?.hotels?.map((hotel, index) => (
                 <HotelCard key={index} hotel={hotel} />
@@ -104,16 +104,16 @@ function VariantDetailsPage() {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Parvozlar:</span>
-                <span className="font-medium">${variant.total_flight_cost.toFixed(0)}</span>
+                <span className="font-medium">${parseFloat(variant.total_flight_cost || 0).toFixed(0)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Mehmonxonalar:</span>
-                <span className="font-medium">${variant.total_hotel_cost.toFixed(0)}</span>
+                <span className="font-medium">${parseFloat(variant.total_hotel_cost || 0).toFixed(0)}</span>
               </div>
               <div className="border-t pt-3">
                 <div className="flex justify-between text-xl font-bold">
                   <span>JAMI:</span>
-                  <span className="text-primary-600">${variant.total_cost.toFixed(0)}</span>
+                  <span className="text-primary-600">${parseFloat(variant.total_cost || 0).toFixed(0)}</span>
                 </div>
                 <p className="text-sm text-gray-500 mt-1">
                   {search.travelers} kishi uchun
@@ -122,14 +122,14 @@ function VariantDetailsPage() {
             </div>
 
             {/* Tejamkorlik */}
-            {variant.savings_percent > 0 && (
+            {parseFloat(variant.savings_percent || 0) > 0 && (
               <div className="mt-6 bg-green-50 rounded-lg p-4">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-green-600">
-                    ${variant.savings_amount.toFixed(0)}
+                    ${parseFloat(variant.savings_amount || 0).toFixed(0)}
                   </div>
                   <div className="text-green-700">
-                    tejaysiz ({variant.savings_percent.toFixed(0)}%)
+                    tejaysiz ({parseFloat(variant.savings_percent || 0).toFixed(0)}%)
                   </div>
                 </div>
               </div>
@@ -139,7 +139,7 @@ function VariantDetailsPage() {
             {details?.bonus && (
               <div className="mt-4 bg-purple-50 rounded-lg p-4 text-center">
                 <span className="text-purple-700 font-medium">
-                  🎁 {details.bonus}
+                  <span className="icon-3d-purple">🎁</span> {details.bonus}
                 </span>
               </div>
             )}
@@ -150,10 +150,10 @@ function VariantDetailsPage() {
                 onClick={handleSaveTrip}
                 className="btn btn-primary w-full"
               >
-                💾 Sayohatni saqlash
+                <span className="icon-3d-sm">💾</span> Sayohatni saqlash
               </button>
               <button className="btn btn-secondary w-full">
-                📤 Ulashish
+                <span className="icon-3d-sm">📤</span> Ulashish
               </button>
             </div>
           </div>

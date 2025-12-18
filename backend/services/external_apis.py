@@ -138,10 +138,10 @@ class AviasalesAPI:
             if flights:
                 data_source = 'travelpayouts_free'
 
-        # 3. Fallback - taxminiy narxlar
-        if not flights:
-            flights = self._get_fallback_flights(origin, destination, departure_date)
-            data_source = 'fallback'
+        # 3. Fallback - taxminiy narxlar (O'CHIRILGAN - faqat real narxlar)
+        # if not flights:
+        #     flights = self._get_fallback_flights(origin, destination, departure_date)
+        #     data_source = 'fallback'
 
         # Ma'lumot manbasi qo'shish
         for flight in flights:

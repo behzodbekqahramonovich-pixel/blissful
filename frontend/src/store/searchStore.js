@@ -66,6 +66,8 @@ const useSearchStore = create(
       partialize: (state) => ({
         savedTrips: state.savedTrips,
         searchParams: state.searchParams,
+        searchResults: state.searchResults,
+        selectedVariant: state.selectedVariant,
       }),
     }
   )

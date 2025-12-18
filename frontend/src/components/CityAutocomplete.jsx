@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { destinationsApi } from '../services/api'
 import clsx from 'clsx'
 
-function CityAutocomplete({ value, onChange, placeholder }) {
+function CityAutocomplete({ value, onChange, placeholder, hasError = false }) {
   const [query, setQuery] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const wrapperRef = useRef(null)
@@ -49,7 +49,7 @@ function CityAutocomplete({ value, onChange, placeholder }) {
         onChange={handleInputChange}
         onFocus={() => setIsOpen(true)}
         placeholder={placeholder}
-        className="input"
+        className={clsx('input', hasError && 'border-red-500 focus:ring-red-500')}
       />
 
       {/* Dropdown */}

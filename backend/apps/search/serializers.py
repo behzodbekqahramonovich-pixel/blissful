@@ -1,6 +1,11 @@
 from rest_framework import serializers
 from .models import TravelSearch, RouteVariant
 from apps.destinations.serializers import CityMinimalSerializer
+from datetime import date, timedelta
+
+
+# Maksimal sayohat davomiyligi (kunlarda)
+MAX_TRIP_DAYS = 60
 
 
 class TravelSearchSerializer(serializers.ModelSerializer):
@@ -32,18 +37,41 @@ class TravelSearchCreateSerializer(serializers.Serializer):
         max_digits=10,
         decimal_places=2,
         required=False,
-        allow_null=True
+        allow_null=True,
+        min_value=0  # Manfiy budget bo'lmasligi kerak
     )
 
+    def validate_departure_date(self, value):
+        """Ketish sanasi bugungi kundan oldin bo'lmasligi kerak"""
+        today = date.today()
+        if value < today:
+            raise serializers.ValidationError(
+                f"Ketish sanasi bugungi kundan ({today.strftime('%Y-%m-%d')}) oldin bo'lishi mumkin emas"
+            )
+        return value
+
     def validate(self, data):
+        """Umumiy validatsiya"""
+        # Qaytish sanasi ketish sanasidan keyin bo'lishi kerak
         if data['departure_date'] >= data['return_date']:
             raise serializers.ValidationError(
                 "Qaytish sanasi ketish sanasidan keyin bo'lishi kerak"
             )
+
+        # Ketish va kelish shaharlari bir xil bo'lmasligi kerak
         if data['origin'] == data['destination']:
             raise serializers.ValidationError(
                 "Ketish va kelish shaharlari bir xil bo'lmasligi kerak"
             )
+
+        # Sayohat davomiyligi maksimal chegaradan oshmasligi kerak
+        trip_days = (data['return_date'] - data['departure_date']).days
+        if trip_days > MAX_TRIP_DAYS:
+            raise serializers.ValidationError(
+                f"Sayohat davomiyligi {MAX_TRIP_DAYS} kundan oshmasligi kerak. "
+                f"Siz {trip_days} kun tanladingiz."
+            )
+
         return data
 
 

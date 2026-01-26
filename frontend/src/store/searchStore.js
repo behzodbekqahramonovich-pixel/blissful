@@ -63,11 +63,9 @@ const useSearchStore = create(
     }),
     {
       name: 'blissful-tour-storage',
+      // Faqat savedTrips saqlanadi - qidiruv natijalari har safar yangilanadi
       partialize: (state) => ({
         savedTrips: state.savedTrips,
-        searchParams: state.searchParams,
-        searchResults: state.searchResults,
-        selectedVariant: state.selectedVariant,
       }),
     }
   )

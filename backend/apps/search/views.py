@@ -16,6 +16,9 @@ from services.route_finder import RouteFinder
 from services.route_optimizer import RouteOptimizer
 from services.external_apis import travelpayouts_api, booking_api
 from services.popular_routes_scraper import popular_routes_scraper
+from services.rss_feed import rss_feed_service
+import os
+import requests as req
 
 
 class TravelSearchViewSet(viewsets.ModelViewSet):
@@ -53,7 +56,7 @@ class TravelSearchViewSet(viewsets.ModelViewSet):
         # Optimallashtirish rejimini olish
         optimization_mode = request.data.get('optimization_mode', 'balanced')
         use_optimizer = request.data.get('use_optimizer', True)
-        use_live_prices = request.data.get('use_live_prices', False)
+        use_live_prices = request.data.get('use_live_prices', True)  # Har doim real narxlar
 
         if use_optimizer:
             # Yangi ilg'or optimizer ishlatish
@@ -338,3 +341,126 @@ class APIStatusView(APIView):
                 ]
             }
         })
+
+
+class TravelNewsView(APIView):
+    """
+    Sayohat yangiliklari API - RSS feed'lardan
+
+    GET /api/v1/search/news/
+    GET /api/v1/search/news/?limit=5
+    GET /api/v1/search/news/?refresh=true
+
+    Kun.uz, Daryo.uz, Gazeta.uz dan sayohatga oid yangiliklar.
+    """
+
+    def get(self, request):
+        limit = int(request.query_params.get('limit', 10))
+        force_refresh = request.query_params.get('refresh', 'false').lower() == 'true'
+
+        # RSS feed'lardan yangiliklar olish
+        news = rss_feed_service.get_news(limit=limit, force_refresh=force_refresh)
+        cache_status = rss_feed_service.get_cache_status()
+
+        return Response({
+            'success': True,
+            'count': len(news),
+            'news': news,
+            'sources': cache_status['sources'],
+            'cached': cache_status['cached'],
+            'last_updated': cache_status['cache_time']
+        })
+
+
+class AIChatView(APIView):
+    """
+    AI Chatbot API - Google Gemini
+
+    POST /api/v1/search/ai-chat/
+    Body: { "message": "Qanday sayohat qilishni maslahat berasiz?" }
+
+    Foydalanuvchilar savollari uchun AI yordamchi.
+    """
+
+    def post(self, request):
+        message = request.data.get('message', '').strip()
+
+        if not message:
+            return Response(
+                {'error': 'Xabar bo\'sh bo\'lishi mumkin emas'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # API key tekshirish
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key or api_key == 'your_gemini_api_key_here':
+            return Response({
+                'success': False,
+                'error': 'AI xizmati hozircha mavjud emas.',
+                'message': 'Kechirasiz, hozircha men sizga yordam bera olmayman. Admin GEMINI_API_KEY ni sozlashi kerak.',
+                'configured': False
+            })
+
+        try:
+            # System context - sayohat bo'yicha yo'naltirish
+            system_instruction = """Siz Blissful Tour platformasining professional sayohat yordamchisisiz.
+
+SIZNING VAZIFALARINGIZ:
+1. Sayohat yo'nalishlari haqida BATAFSIL ma'lumot berish
+2. Eng arzon va qulay yo'nalishlarni topishda yordam qilish
+3. Tranzit sayohatlar, viza, mehmonxona va parvozlar bo'yicha to'liq maslahat berish
+4. Turistik joylar, madaniyat va mahalliy odatlar haqida ma'lumot berish
+5. Sayohat uchun kerakli hujjatlar va tavsiyalar berish
+
+JAVOB BERISH TARZI:
+- Har doim O'zbek tilida yozing
+- To'liq, batafsil va foydali javoblar bering
+- Raqamli ro'yxatlar va tuzilgan formatdan foydalaning
+- Praktik maslahatlar va konkret misollar keltiring
+- Samimiy va do'stona muloqot qiling
+- Agar ma'lumot ko'p bo'lsa, tartibli va tushunarli tarzda yozing
+
+Muhim: Javoblaringiz qisqa emas, balki TO'LIQ va BATAFSIL bo'lishi kerak!"""
+
+            # Google Gemini API - REST orqali to'g'ridan-to'g'ri (v1)
+            # Gemini 2.5 Flash - eng yangi va tez model
+            url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={api_key}"
+
+            payload = {
+                "contents": [{
+                    "parts": [{
+                        "text": f"{system_instruction}\n\nFoydalanuvchi: {message}"
+                    }]
+                }],
+                "generationConfig": {
+                    "temperature": 0.9,
+                    "topP": 0.95,
+                    "topK": 40,
+                    "maxOutputTokens": 4096,  # To'liq javoblar uchun
+                }
+            }
+
+            response = req.post(url, json=payload, timeout=60)
+            response.raise_for_status()
+
+            data = response.json()
+
+            # Javobni olish
+            if 'candidates' in data and len(data['candidates']) > 0:
+                ai_message = data['candidates'][0]['content']['parts'][0]['text']
+            else:
+                ai_message = "Kechirasiz, javob olishda xatolik yuz berdi."
+
+            return Response({
+                'success': True,
+                'message': ai_message,
+                'configured': True
+            })
+
+        except Exception as e:
+            return Response({
+                'success': False,
+                'error': str(e),
+                'message': 'Kechirasiz, xatolik yuz berdi. Iltimos, qayta urinib ko\'ring.',
+                'configured': True
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

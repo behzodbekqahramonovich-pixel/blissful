@@ -4,6 +4,8 @@ import HomePage from './pages/HomePage'
 import SearchResultsPage from './pages/SearchResultsPage'
 import VariantDetailsPage from './pages/VariantDetailsPage'
 import MyTripsPage from './pages/MyTripsPage'
+import AgencyDashboard from './pages/AgencyDashboard'
+import AuthRequired from './components/AuthRequired'
 
 // Admin pages
 import AdminLoginPage from './pages/admin/AdminLoginPage'
@@ -17,11 +19,12 @@ import ProtectedRoute from './components/admin/ProtectedRoute'
 function App() {
   return (
     <Routes>
-      {/* Public routes */}
-      <Route path="/" element={<Layout><HomePage /></Layout>} />
-      <Route path="/search" element={<Layout><SearchResultsPage /></Layout>} />
-      <Route path="/search/:id/variant/:num" element={<Layout><VariantDetailsPage /></Layout>} />
-      <Route path="/my-trips" element={<Layout><MyTripsPage /></Layout>} />
+      {/* Protected user routes */}
+      <Route path="/" element={<AuthRequired><Layout><HomePage /></Layout></AuthRequired>} />
+      <Route path="/search" element={<AuthRequired><Layout><SearchResultsPage /></Layout></AuthRequired>} />
+      <Route path="/search/:id/variant/:num" element={<AuthRequired><Layout><VariantDetailsPage /></Layout></AuthRequired>} />
+      <Route path="/my-trips" element={<AuthRequired><Layout><MyTripsPage /></Layout></AuthRequired>} />
+      <Route path="/agency" element={<AuthRequired><AgencyDashboard /></AuthRequired>} />
 
       {/* Admin routes */}
       <Route path="/admin/login" element={<AdminLoginPage />} />

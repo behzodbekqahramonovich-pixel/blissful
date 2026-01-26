@@ -361,7 +361,67 @@ function HotelCard({ hotel }) {
       5: ['Royal Palace', 'Grand Resort', 'Elite Suites'],
     }
 
+    // Alternativ mehmonxona rasmlari
+    const altImages = {
+      1: [
+        'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=400&h=300&fit=crop',
+        'https://images.unsplash.com/photo-1520277739336-7bf67edfa768?w=400&h=300&fit=crop',
+        'https://images.unsplash.com/photo-1590490360182-c33d57733427?w=400&h=300&fit=crop',
+      ],
+      2: [
+        'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=400&h=300&fit=crop',
+        'https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=400&h=300&fit=crop',
+        'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=400&h=300&fit=crop',
+      ],
+      3: [
+        'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&h=300&fit=crop',
+        'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=400&h=300&fit=crop',
+        'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400&h=300&fit=crop',
+      ],
+      4: [
+        'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=400&h=300&fit=crop',
+        'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=400&h=300&fit=crop',
+        'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=400&h=300&fit=crop',
+      ],
+      5: [
+        'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=400&h=300&fit=crop',
+        'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=400&h=300&fit=crop',
+        'https://images.unsplash.com/photo-1615460549969-36fa19521a4f?w=400&h=300&fit=crop',
+      ],
+    }
+
+    // Alternativ mehmonxona qulayliklari
+    const altAmenities = {
+      1: [
+        [{ icon: '📶', name: 'WiFi' }, { icon: '🚿', name: 'Umumiy hammom' }],
+        [{ icon: '📶', name: 'WiFi' }, { icon: '☕', name: 'Choy/Kofe' }],
+        [{ icon: '📶', name: 'WiFi' }, { icon: '🔒', name: 'Shkafcha' }],
+      ],
+      2: [
+        [{ icon: '📶', name: 'Bepul WiFi' }, { icon: '❄️', name: 'Konditsioner' }, { icon: '📺', name: 'TV' }],
+        [{ icon: '📶', name: 'Bepul WiFi' }, { icon: '🅿️', name: 'Parking' }, { icon: '☕', name: 'Nonushta' }],
+        [{ icon: '📶', name: 'Bepul WiFi' }, { icon: '🧹', name: 'Tozalash' }, { icon: '📺', name: 'TV' }],
+      ],
+      3: [
+        [{ icon: '📶', name: 'Bepul WiFi' }, { icon: '🍳', name: 'Nonushta' }, { icon: '💪', name: 'Fitnes' }],
+        [{ icon: '📶', name: 'Bepul WiFi' }, { icon: '🏊', name: 'Basseyn' }, { icon: '🅿️', name: 'Parking' }],
+        [{ icon: '📶', name: 'Bepul WiFi' }, { icon: '🍽️', name: 'Restoran' }, { icon: '🛎️', name: '24/7' }],
+      ],
+      4: [
+        [{ icon: '📶', name: 'Premium WiFi' }, { icon: '🏊', name: 'Basseyn' }, { icon: '💆', name: 'SPA' }, { icon: '🍳', name: 'Nonushta' }],
+        [{ icon: '📶', name: 'Premium WiFi' }, { icon: '💪', name: 'Fitnes' }, { icon: '🍽️', name: 'Restoran' }, { icon: '🛎️', name: 'Concierge' }],
+        [{ icon: '📶', name: 'Premium WiFi' }, { icon: '🏊', name: 'Basseyn' }, { icon: '🧖', name: 'Sauna' }, { icon: '🅿️', name: 'Valet' }],
+      ],
+      5: [
+        [{ icon: '📶', name: 'Premium WiFi' }, { icon: '💆', name: 'SPA' }, { icon: '🍽️', name: 'Michelin' }, { icon: '🛎️', name: 'Butler' }, { icon: '🚁', name: 'Vertolyot' }],
+        [{ icon: '📶', name: 'Premium WiFi' }, { icon: '🏊', name: 'Infinity Pool' }, { icon: '🧖', name: 'Hamam' }, { icon: '🍾', name: 'Minibar' }, { icon: '🎭', name: 'VIP' }],
+        [{ icon: '📶', name: 'Premium WiFi' }, { icon: '💎', name: 'Luxury SPA' }, { icon: '🍷', name: 'Wine bar' }, { icon: '🛥️', name: 'Yacht' }, { icon: '🌟', name: 'Penthouse' }],
+      ],
+    }
+
     const names = altNames[stars] || altNames[3]
+    const images = altImages[stars] || altImages[3]
+    const amenities = altAmenities[stars] || altAmenities[3]
     const priceVariations = [0.85, 1.0, 1.15]
 
     return names.map((name, i) => ({
@@ -370,7 +430,43 @@ function HotelCard({ hotel }) {
       rating: (7.0 + stars * 0.4 + Math.random() * 0.5).toFixed(1),
       stars: stars,
       reviews: Math.floor(100 + Math.random() * 900),
+      image: images[i],
+      amenities: amenities[i],
+      description: getAltDescription(stars, i),
+      distance: (0.5 + Math.random() * 3).toFixed(1),
     }))
+  }
+
+  // Alternativ mehmonxona tavsifi
+  const getAltDescription = (starCount, index) => {
+    const descriptions = {
+      1: [
+        'Shahar markazida joylashgan qulay hostel. Sayohatchilar uchun ideal.',
+        'Arzon narxda toza va xavfsiz turar joy. Metro yaqinida.',
+        'Yoshlar uchun do\'stona muhit. Umumiy oshxona mavjud.',
+      ],
+      2: [
+        'Yaxshi joylashuv, qulay xonalar. Biznes sayohatchilar uchun.',
+        'Oilaviy mehmonxona, tinch muhit. Bog\'cha yaqinida.',
+        'Zamonaviy dizayn, hamyonbop narxlar.',
+      ],
+      3: [
+        'Professional xizmat, qulay xonalar. Konferens-zal mavjud.',
+        'Basseyn va fitnes zal. Oilalar uchun qulay.',
+        'Markazda joylashgan, restoran va bar mavjud.',
+      ],
+      4: [
+        'Hashamatli xonalar, yuqori sifatli xizmat. SPA markazi.',
+        'Panoramali manzara, executive lounge. Biznes uchun ideal.',
+        'Dizayner interer, gurme restoran. VIP xizmat.',
+      ],
+      5: [
+        'Dunyodagi eng yaxshi mehmonxonalardan biri. Butler xizmati.',
+        'Shohona hashamat, Michelin yulduzli restoran. Helikopter maydoni.',
+        'Eksklyuziv penthouse, shaxsiy basseyn. Mashhurlar tanlovi.',
+      ],
+    }
+    return descriptions[starCount]?.[index] || 'Qulay va zamonaviy mehmonxona.'
   }
 
   const allAmenities = getAmenities()
@@ -529,41 +625,41 @@ function HotelCard({ hotel }) {
       {/* Katta galereya modal */}
       {showGallery && (
         <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
           onClick={() => setShowGallery(false)}
         >
           <button
             onClick={() => setShowGallery(false)}
-            className="absolute top-4 right-4 text-white text-4xl hover:text-gray-300 z-10"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 text-white text-3xl sm:text-4xl hover:text-gray-300 z-10 w-10 h-10 flex items-center justify-center"
           >
             ×
           </button>
 
           <button
             onClick={(e) => { e.stopPropagation(); prevImage(); }}
-            className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 text-white w-12 h-12 rounded-full flex items-center justify-center text-2xl"
+            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 text-white w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xl sm:text-2xl"
           >
             ‹
           </button>
 
-          <div className="max-w-4xl max-h-[80vh] px-16" onClick={(e) => e.stopPropagation()}>
+          <div className="max-w-4xl max-h-[80vh] px-12 sm:px-16 w-full" onClick={(e) => e.stopPropagation()}>
             <img
               src={hotelImages[activeImageIndex]}
               alt={`${getHotelName()} - Rasm ${activeImageIndex + 1}`}
-              className="max-w-full max-h-[70vh] object-contain rounded-lg"
+              className="max-w-full max-h-[60vh] sm:max-h-[70vh] object-contain rounded-lg mx-auto"
             />
-            <div className="text-center mt-4">
-              <p className="text-white text-lg font-medium">{getHotelName()}</p>
-              <p className="text-gray-400">{activeImageIndex + 1} / {hotelImages.length}</p>
+            <div className="text-center mt-3 sm:mt-4">
+              <p className="text-white text-base sm:text-lg font-medium truncate">{getHotelName()}</p>
+              <p className="text-gray-400 text-sm">{activeImageIndex + 1} / {hotelImages.length}</p>
             </div>
 
-            {/* Thumbnail strip */}
-            <div className="flex justify-center space-x-2 mt-4">
+            {/* Thumbnail strip - smaller on mobile */}
+            <div className="flex justify-center space-x-1.5 sm:space-x-2 mt-3 sm:mt-4 overflow-x-auto pb-2">
               {hotelImages.map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => setActiveImageIndex(idx)}
-                  className={`w-16 h-12 rounded overflow-hidden border-2 transition-all ${
+                  className={`w-12 h-9 sm:w-16 sm:h-12 rounded overflow-hidden border-2 transition-all flex-shrink-0 ${
                     idx === activeImageIndex
                       ? 'border-white'
                       : 'border-transparent opacity-50 hover:opacity-100'
@@ -577,7 +673,7 @@ function HotelCard({ hotel }) {
 
           <button
             onClick={(e) => { e.stopPropagation(); nextImage(); }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 text-white w-12 h-12 rounded-full flex items-center justify-center text-2xl"
+            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 text-white w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xl sm:text-2xl"
           >
             ›
           </button>
@@ -710,82 +806,162 @@ function HotelCard({ hotel }) {
           </button>
 
           {showAlternatives && (
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               {altHotels
                 .sort((a, b) => a.price_per_night - b.price_per_night)
                 .map((alt, i, sortedArr) => {
                   const isMin = alt.price_per_night === priceRange.minPerNight
                   const isMax = alt.price_per_night === priceRange.maxPerNight
+                  const isSelected = selectedHotel === i
 
                   return (
                     <div
                       key={i}
-                      className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                      className={`rounded-xl border-2 transition-all cursor-pointer overflow-hidden flex flex-col ${
                         isMin
                           ? 'border-green-400 bg-green-50'
                           : isMax
                           ? 'border-orange-300 bg-orange-50'
-                          : selectedHotel === i
+                          : isSelected
                           ? 'border-primary-500 bg-primary-50'
-                          : 'border-gray-200 bg-gray-50 hover:border-primary-300'
+                          : 'border-gray-200 bg-white hover:border-primary-300 hover:shadow-md'
                       }`}
-                      onClick={() => setSelectedHotel(selectedHotel === i ? null : i)}
+                      onClick={() => setSelectedHotel(isSelected ? null : i)}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-800">{alt.name}</span>
-                            {isMin && (
-                              <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-medium flex items-center">
-                                <span className="icon-3d-sm mr-1">💚</span> Eng arzon
-                              </span>
-                            )}
-                            {isMax && (
-                              <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full font-medium flex items-center">
-                                <span className="icon-3d-sm mr-1">🧡</span> Premium
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center text-xs text-gray-500 mt-1">
-                            <span className="flex mr-2">{renderStars(alt.stars)}</span>
-                            <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded mr-2">
-                              {alt.rating}
+                      {/* Compact view with image header */}
+                      <div className="relative h-24 sm:h-28 overflow-hidden">
+                        <img
+                          src={alt.image}
+                          alt={alt.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.src = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&h=200&fit=crop'
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+
+                        {/* Badges */}
+                        <div className="absolute top-2 left-2 right-2 flex justify-between items-start">
+                          {isMin ? (
+                            <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium shadow">
+                              💚 Eng arzon
                             </span>
-                            <span>{alt.reviews} sharh</span>
-                          </div>
+                          ) : isMax ? (
+                            <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium shadow">
+                              🧡 Premium
+                            </span>
+                          ) : (
+                            <span></span>
+                          )}
+                          <span className="bg-green-500 text-white text-xs px-2 py-1 rounded font-bold shadow">
+                            {alt.rating}
+                          </span>
                         </div>
-                        <div className="text-right">
-                          <div className={`font-bold ${isMin ? 'text-green-600' : isMax ? 'text-orange-600' : 'text-primary-600'}`}>
+
+                        {/* Narx */}
+                        <div className="absolute bottom-2 right-2 bg-white rounded-lg px-2 py-1 shadow">
+                          <div className={`text-lg font-bold ${isMin ? 'text-green-600' : isMax ? 'text-orange-600' : 'text-primary-600'}`}>
                             ${alt.price_per_night}
                           </div>
-                          <div className="text-xs text-gray-400">kechalik</div>
+                          <div className="text-xs text-gray-400 text-center">kechalik</div>
                         </div>
                       </div>
-                      {selectedHotel === i && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">{nights} kecha uchun:</span>
-                            <span className={`font-bold ${isMin ? 'text-green-600' : isMax ? 'text-orange-600' : 'text-primary-600'}`}>
-                              ${alt.price_per_night * nights}
-                            </span>
-                          </div>
-                          {isMin && (
-                            <div className="mt-2 bg-green-100 text-green-700 text-xs text-center py-1 rounded">
-                              Bu eng arzon variant! ${priceRange.maxTotal - (alt.price_per_night * nights)} tejaysiz
+
+                      {/* Info */}
+                      <div className="p-3 flex-1">
+                        <h5 className="font-semibold text-gray-800 text-sm leading-tight mb-1 line-clamp-2">{alt.name}</h5>
+                        <div className="flex items-center text-xs text-gray-500 gap-2">
+                          <span className="flex">{renderStars(alt.stars)}</span>
+                          <span>•</span>
+                          <span>📍 {alt.distance} km</span>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-500">
+                          {nights} kecha: <span className={`font-bold ${isMin ? 'text-green-600' : isMax ? 'text-orange-600' : 'text-primary-600'}`}>${alt.price_per_night * nights}</span>
+                        </div>
+                      </div>
+
+                      {/* Expanded view */}
+                      {isSelected && (
+                        <div className="border-t border-gray-200 bg-white">
+                          {/* Katta rasm */}
+                          <div className="relative h-32 sm:h-40">
+                            <img
+                              src={alt.image}
+                              alt={alt.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.src = 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&h=400&fit=crop'
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                            <div className="absolute bottom-3 left-3 right-3">
+                              <h5 className="text-white font-bold text-lg">{alt.name}</h5>
+                              <p className="text-white/80 text-sm flex items-center gap-2">
+                                <span>{renderStars(alt.stars)}</span>
+                                <span>•</span>
+                                <span>{alt.reviews} sharh</span>
+                              </p>
                             </div>
-                          )}
-                          <a
-                            href={getBookingLink()}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`mt-2 block w-full text-center py-2 rounded text-sm font-medium transition-colors ${
-                              isMin
-                                ? 'bg-green-500 hover:bg-green-600 text-white'
-                                : 'bg-primary-100 hover:bg-primary-200 text-primary-700'
-                            }`}
-                          >
-                            {isMin ? '🔥 Hozir bron qilish' : 'Bron qilish →'}
-                          </a>
+                            {/* Reyting badge */}
+                            <div className="absolute top-3 right-3 bg-green-500 text-white rounded-lg px-2 py-1 font-bold">
+                              {alt.rating}
+                            </div>
+                          </div>
+
+                          {/* Tafsilotlar */}
+                          <div className="p-4 space-y-4">
+                            {/* Tavsif */}
+                            <p className="text-gray-600 text-sm">{alt.description}</p>
+
+                            {/* Joylashuv */}
+                            <div className="flex items-center text-sm text-gray-500">
+                              <span className="icon-3d-sm mr-2">📍</span>
+                              Markazdan {alt.distance} km
+                            </div>
+
+                            {/* Qulayliklar */}
+                            <div>
+                              <p className="text-xs text-gray-500 mb-2">Qulayliklar:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {alt.amenities?.map((amenity, idx) => (
+                                  <span key={idx} className="inline-flex items-center text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                                    <span className="mr-1">{amenity.icon}</span>
+                                    {amenity.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Narx hisob-kitob */}
+                            <div className={`rounded-lg p-3 ${isMin ? 'bg-green-100' : isMax ? 'bg-orange-100' : 'bg-gray-100'}`}>
+                              <div className="flex justify-between items-center mb-2">
+                                <span className="text-gray-600">${alt.price_per_night} × {nights} kecha</span>
+                                <span className={`text-xl font-bold ${isMin ? 'text-green-600' : isMax ? 'text-orange-600' : 'text-primary-600'}`}>
+                                  ${alt.price_per_night * nights}
+                                </span>
+                              </div>
+                              {isMin && (
+                                <div className="text-green-700 text-sm text-center bg-green-200 rounded py-1">
+                                  ✨ Eng arzon variant! ${priceRange.maxTotal - (alt.price_per_night * nights)} tejaysiz
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Bron tugmasi */}
+                            <a
+                              href={getBookingLink()}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className={`block w-full text-center py-3 rounded-lg font-medium transition-all duration-300 ${
+                                isMin
+                                  ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg hover:shadow-xl'
+                                  : 'bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white shadow-lg hover:shadow-xl'
+                              }`}
+                            >
+                              {isMin ? '🔥 Hozir bron qilish' : '📅 Booking.com da ko\'rish'}
+                            </a>
+                          </div>
                         </div>
                       )}
                     </div>

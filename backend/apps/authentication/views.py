@@ -7,8 +7,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
-from .serializers import LoginSerializer, UserLoginSerializer, RegisterSerializer, UserSerializer, RefreshTokenSerializer
+from .serializers import (
+    LoginSerializer, UserLoginSerializer, RegisterSerializer, UserSerializer,
+    RefreshTokenSerializer, AgencyClientSerializer, BookingSerializer
+)
 from .middleware import JWTAuthentication
+from .models import AgencyClient, Booking
 
 
 def generate_tokens(user):
@@ -200,3 +204,185 @@ class MeView(APIView):
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+
+class AgencyClientsView(APIView):
+    """
+    Agency clients list and create endpoint.
+    Only agency users can access this.
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Faqat agentlik foydalanuvchilari
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'agency':
+            return Response(
+                {'error': 'Faqat agentliklar uchun'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        clients = AgencyClient.objects.filter(agency=request.user.profile, is_active=True)
+        serializer = AgencyClientSerializer(clients, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        # Faqat agentlik foydalanuvchilari
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'agency':
+            return Response(
+                {'error': 'Faqat agentliklar uchun'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = AgencyClientSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(agency=request.user.profile)
+            # Update total clients count
+            request.user.profile.total_clients = AgencyClient.objects.filter(
+                agency=request.user.profile, is_active=True
+            ).count()
+            request.user.profile.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AgencyClientDetailView(APIView):
+    """
+    Agency client detail, update and delete endpoint.
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, pk, user):
+        try:
+            return AgencyClient.objects.get(pk=pk, agency=user.profile)
+        except AgencyClient.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'agency':
+            return Response(
+                {'error': 'Faqat agentliklar uchun'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        client = self.get_object(pk, request.user)
+        if not client:
+            return Response(
+                {'error': 'Mijoz topilmadi'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = AgencyClientSerializer(client)
+        return Response(serializer.data)
+
+    def put(self, request, pk):
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'agency':
+            return Response(
+                {'error': 'Faqat agentliklar uchun'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        client = self.get_object(pk, request.user)
+        if not client:
+            return Response(
+                {'error': 'Mijoz topilmadi'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = AgencyClientSerializer(client, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'agency':
+            return Response(
+                {'error': 'Faqat agentliklar uchun'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        client = self.get_object(pk, request.user)
+        if not client:
+            return Response(
+                {'error': 'Mijoz topilmadi'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        client.is_active = False
+        client.save()
+        # Update total clients count
+        request.user.profile.total_clients = AgencyClient.objects.filter(
+            agency=request.user.profile, is_active=True
+        ).count()
+        request.user.profile.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AgencyBookingsView(APIView):
+    """
+    Agency bookings list and create endpoint.
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Faqat agentlik foydalanuvchilari
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'agency':
+            return Response(
+                {'error': 'Faqat agentliklar uchun'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        bookings = Booking.objects.filter(user=request.user).order_by('-created_at')
+        serializer = BookingSerializer(bookings, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        # Faqat agentlik foydalanuvchilari
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'agency':
+            return Response(
+                {'error': 'Faqat agentliklar uchun'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = BookingSerializer(data=request.data)
+        if serializer.is_valid():
+            booking = serializer.save(user=request.user)
+            # Update total bookings count
+            request.user.profile.total_bookings = Booking.objects.filter(
+                user=request.user
+            ).count()
+            request.user.profile.save()
+            return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AgencyStatsView(APIView):
+    """
+    Agency dashboard statistics.
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'agency':
+            return Response(
+                {'error': 'Faqat agentliklar uchun'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        profile = request.user.profile
+        clients = AgencyClient.objects.filter(agency=profile, is_active=True)
+        bookings = Booking.objects.filter(user=request.user)
+
+        stats = {
+            'total_clients': clients.count(),
+            'total_bookings': bookings.count(),
+            'confirmed_bookings': bookings.filter(status='confirmed').count(),
+            'pending_bookings': bookings.filter(status='pending').count(),
+            'total_revenue': sum(float(b.total_cost) for b in bookings.filter(status__in=['confirmed', 'completed'])),
+        }
+
+        return Response(stats)

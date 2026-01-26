@@ -22,6 +22,14 @@ function SearchForm({ compact = false }) {
   const navigate = useNavigate()
   const { searchParams, setSearchParams, setSearchResults, setLoading, setError } = useSearchStore()
 
+  // Qaytish sanasini hisoblash (ketishdan 7 kun keyin)
+  const getDefaultReturnDate = (depDate) => {
+    if (!depDate) return null
+    const date = new Date(depDate)
+    date.setDate(date.getDate() + 7)
+    return date
+  }
+
   const [origin, setOrigin] = useState(null)
   const [destination, setDestination] = useState(null)
   const [departureDate, setDepartureDate] = useState(null)
@@ -119,22 +127,66 @@ function SearchForm({ compact = false }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className={compact ? 'space-y-4' : 'space-y-6'}>
-      {/* Umumiy xato xabari */}
-      {Object.keys(validationErrors).length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start space-x-3">
-          <span className="text-2xl">⚠️</span>
-          <div>
-            <h4 className="font-semibold text-red-800">Xatoliklar topildi</h4>
-            <p className="text-red-600 text-sm mt-1">Iltimos, quyidagi maydonlarni to'g'rilang:</p>
-            <ul className="text-red-600 text-sm mt-2 list-disc list-inside">
-              {Object.values(validationErrors).filter(Boolean).map((error, idx) => (
-                <li key={idx}>{error}</li>
-              ))}
-            </ul>
+    <>
+      {/* Flying airplane animation overlay */}
+      {isSearching && (
+        <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-primary-900/95 via-primary-800/95 to-primary-900/95 flex items-center justify-center px-4">
+          {/* Background pattern - hidden on mobile for performance */}
+          <div className="absolute inset-0 opacity-10 hidden sm:block">
+            <div className="absolute inset-0" style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M54.627 0l.83.828-1.415 1.415L51.8 0h2.827zM5.373 0l-.83.828L5.96 2.243 8.2 0H5.374zM48.97 0l3.657 3.657-1.414 1.414L46.143 0h2.828zM11.03 0L7.372 3.657 8.787 5.07 13.857 0H11.03zm32.284 0L49.8 6.485 48.384 7.9l-7.9-7.9h2.83zM16.686 0L10.2 6.485 11.616 7.9l7.9-7.9h-2.83zM22.344 0L13.858 8.485 15.272 9.9l9.9-9.9h-2.828zM32 0l-3.486 3.485-1.414-1.414L30.172 0H32zM0 5.373l.828-.83 1.415 1.415L0 8.2V5.374zm0 5.656l.828-.829 5.657 5.657-1.414 1.414L0 11.03v-.001zm0 5.656l.828-.828 8.485 8.485-1.414 1.414L0 16.686v-.001zm0 5.657l.828-.828 11.314 11.314-1.414 1.414L0 22.343v-.001zM60 5.373V8.2l-2.243-2.243L59.172 4.543 60 5.373zM60 11.03v2.828l-5.657-5.657 1.414-1.414L60 11.03zm0 5.656v2.83l-8.485-8.486 1.414-1.414L60 16.686zm0 5.657v2.828l-11.314-11.314 1.414-1.414L60 22.343z' fill='%23ffffff' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E")`,
+            }} />
+          </div>
+
+          {/* Clouds - fewer on mobile */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-1/4 left-0 w-20 sm:w-32 h-10 sm:h-16 bg-white/10 rounded-full blur-2xl animate-cloud-1"></div>
+            <div className="absolute top-1/3 right-0 w-24 sm:w-40 h-12 sm:h-20 bg-white/10 rounded-full blur-2xl animate-cloud-2"></div>
+            <div className="absolute bottom-1/4 left-1/4 w-16 sm:w-24 h-8 sm:h-12 bg-white/10 rounded-full blur-2xl animate-cloud-3 hidden sm:block"></div>
+            <div className="absolute top-1/2 right-1/4 w-20 sm:w-36 h-10 sm:h-18 bg-white/10 rounded-full blur-2xl animate-cloud-1 hidden sm:block"></div>
+          </div>
+
+          {/* Flying airplane */}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="animate-fly-across">
+              <span className="text-5xl sm:text-6xl md:text-8xl drop-shadow-2xl" style={{ filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.3))' }}>✈️</span>
+            </div>
+          </div>
+
+          {/* Trail effect - hidden on mobile */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden hidden sm:block">
+            <div className="animate-trail-1 absolute w-2 h-2 bg-white/40 rounded-full"></div>
+            <div className="animate-trail-2 absolute w-1.5 h-1.5 bg-white/30 rounded-full"></div>
+            <div className="animate-trail-3 absolute w-1 h-1 bg-white/20 rounded-full"></div>
+          </div>
+
+          {/* Content */}
+          <div className="relative text-center text-white z-10 w-full max-w-md">
+            <div className="mb-6 sm:mb-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-white/10 rounded-full mb-4 animate-pulse-slow">
+                <span className="text-3xl sm:text-4xl">🌍</span>
+              </div>
+            </div>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 animate-fade-in">
+              Yo'nalishlar qidirilmoqda...
+            </h2>
+            <p className="text-base sm:text-lg text-white/80 mb-4 sm:mb-6 animate-fade-in animation-delay-200 truncate px-4">
+              {origin?.name_uz || origin?.name} → {destination?.name_uz || destination?.name}
+            </p>
+
+            {/* Progress bar */}
+            <div className="w-full max-w-xs sm:max-w-sm mx-auto bg-white/20 rounded-full h-2 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-white to-primary-300 rounded-full animate-progress"></div>
+            </div>
+
+            <p className="text-xs sm:text-sm text-white/60 mt-4 animate-fade-in animation-delay-400">
+              Aviasales.uz dan real narxlar olinmoqda
+            </p>
           </div>
         </div>
       )}
+
+      <form onSubmit={handleSubmit} className={compact ? 'space-y-4' : 'space-y-6'}>
 
       <div className={`grid ${compact ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'} gap-4`}>
         {/* Qayerdan */}
@@ -182,7 +234,11 @@ function SearchForm({ compact = false }) {
             selected={departureDate}
             onChange={(date) => {
               setDepartureDate(date)
-              setValidationErrors(prev => ({ ...prev, departureDate: null }))
+              // Qaytish sanasini avtomatik yangilash (ketishdan 7 kun keyin)
+              if (date && (!returnDate || returnDate <= date)) {
+                setReturnDate(getDefaultReturnDate(date))
+              }
+              setValidationErrors(prev => ({ ...prev, departureDate: null, returnDate: null }))
             }}
             minDate={new Date()}
             dateFormat="dd/MM/yyyy"
@@ -250,7 +306,7 @@ function SearchForm({ compact = false }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {/* Yo'lovchilar */}
             <div>
               <label className="label">Yo'lovchilar soni</label>
@@ -319,12 +375,12 @@ function SearchForm({ compact = false }) {
           </div>
 
           {/* Real vaqtdagi narxlar - doimo yoqilgan */}
-          <div className="flex items-center justify-center p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
-            <div className="flex items-center">
-              <span className="text-2xl mr-3 icon-3d-pulse">🟢</span>
-              <span className="text-gray-700 font-medium">
+          <div className="flex items-center justify-center p-3 sm:p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+            <div className="flex flex-col sm:flex-row items-center text-center sm:text-left">
+              <span className="text-xl sm:text-2xl mb-1 sm:mb-0 sm:mr-3 icon-3d-pulse">🟢</span>
+              <span className="text-gray-700 font-medium text-sm sm:text-base">
                 <span className="text-green-600">Real vaqtdagi narxlar</span>
-                <span className="text-gray-500 text-sm ml-2">(Aviasales.uz dan)</span>
+                <span className="text-gray-500 text-xs sm:text-sm block sm:inline sm:ml-2">(Aviasales.uz dan)</span>
               </span>
             </div>
           </div>
@@ -355,6 +411,7 @@ function SearchForm({ compact = false }) {
         </button>
       </div>
     </form>
+    </>
   )
 }
 

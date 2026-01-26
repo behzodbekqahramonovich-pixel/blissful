@@ -62,6 +62,10 @@
   animation: fadeIn 0.3s ease-out;
 }
 
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
 @keyframes pulse-slow {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
@@ -521,4 +525,480 @@
 .icon-3d-pulse {
   display: inline-block;
   animation: pulse3d 2s ease-in-out infinite;
+}
+
+/* Hero Background Animations */
+@keyframes slowZoom {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-slow-zoom {
+  animation: slowZoom 20s ease-in-out infinite;
+}
+
+/* Floating animations */
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-30px) rotate(10deg);
+  }
+}
+
+@keyframes floatMedium {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(-5deg);
+  }
+}
+
+@keyframes floatFast {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-15px) rotate(5deg);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 8s ease-in-out infinite;
+}
+
+.animate-float-medium {
+  animation: floatMedium 6s ease-in-out infinite;
+}
+
+.animate-float-fast {
+  animation: floatFast 4s ease-in-out infinite;
+}
+
+/* Particle animation */
+@keyframes particle {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100px) translateX(20px);
+    opacity: 0;
+  }
+}
+
+.animate-particle {
+  animation: particle 5s ease-in-out infinite;
+}
+
+/* Fade in up animation */
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.animation-delay-200 {
+  animation-delay: 0.2s;
+  opacity: 0;
+}
+
+.animation-delay-400 {
+  animation-delay: 0.4s;
+  opacity: 0;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+/* Blob animation */
+@keyframes blob {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(20px, -30px) scale(1.1);
+  }
+  50% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  75% {
+    transform: translate(30px, 10px) scale(1.05);
+  }
+}
+
+.animate-blob {
+  animation: blob 8s ease-in-out infinite;
+}
+
+/* Gradient shift animation */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradientShift 10s ease infinite;
+}
+
+/* Gradient X animation */
+@keyframes gradientX {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient-x {
+  background-size: 200% 100%;
+  animation: gradientX 8s ease infinite;
+}
+
+/* Wave animation */
+@keyframes wave {
+  0% {
+    transform: translateX(0) translateY(0);
+  }
+  50% {
+    transform: translateX(-25%) translateY(-5px);
+  }
+  100% {
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.animate-wave {
+  animation: wave 10s linear infinite;
+}
+
+.bg-wave {
+  background: repeating-linear-gradient(
+    90deg,
+    currentColor 0px,
+    currentColor 20px,
+    transparent 20px,
+    transparent 40px
+  );
+  width: 200%;
+}
+
+/* Dash animation for SVG paths */
+@keyframes dash {
+  0% {
+    stroke-dashoffset: 1000;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-dash {
+  stroke-dasharray: 20, 10;
+  animation: dash 20s linear infinite;
+}
+
+/* Flying airplane animation */
+@keyframes flyAcross {
+  0% {
+    transform: translate(-100px, 60vh) rotate(-15deg) scale(0.5);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(50vw, 30vh) rotate(-10deg) scale(1);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(110vw, 10vh) rotate(-5deg) scale(0.8);
+    opacity: 0;
+  }
+}
+
+.animate-fly-across {
+  animation: flyAcross 3s ease-in-out infinite;
+}
+
+/* Cloud animations */
+@keyframes cloud1 {
+  0%, 100% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(100vw);
+  }
+}
+
+@keyframes cloud2 {
+  0%, 100% {
+    transform: translateX(100vw);
+  }
+  50% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes cloud3 {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0);
+  }
+  50% {
+    transform: translateX(50%) translateY(-20px);
+  }
+}
+
+.animate-cloud-1 {
+  animation: cloud1 15s ease-in-out infinite;
+}
+
+.animate-cloud-2 {
+  animation: cloud2 20s ease-in-out infinite;
+}
+
+.animate-cloud-3 {
+  animation: cloud3 12s ease-in-out infinite;
+}
+
+/* Trail animations */
+@keyframes trail1 {
+  0% {
+    left: -10px;
+    top: 62vh;
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+  }
+  50% {
+    left: 48vw;
+    top: 32vh;
+    opacity: 0.4;
+  }
+  90% {
+    opacity: 0.2;
+  }
+  100% {
+    left: 108vw;
+    top: 12vh;
+    opacity: 0;
+  }
+}
+
+@keyframes trail2 {
+  0% {
+    left: -30px;
+    top: 63vh;
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.5;
+  }
+  50% {
+    left: 46vw;
+    top: 33vh;
+    opacity: 0.3;
+  }
+  85% {
+    opacity: 0.1;
+  }
+  100% {
+    left: 106vw;
+    top: 13vh;
+    opacity: 0;
+  }
+}
+
+@keyframes trail3 {
+  0% {
+    left: -50px;
+    top: 64vh;
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.4;
+  }
+  50% {
+    left: 44vw;
+    top: 34vh;
+    opacity: 0.2;
+  }
+  80% {
+    opacity: 0.1;
+  }
+  100% {
+    left: 104vw;
+    top: 14vh;
+    opacity: 0;
+  }
+}
+
+.animate-trail-1 {
+  animation: trail1 3s ease-in-out infinite;
+}
+
+.animate-trail-2 {
+  animation: trail2 3s ease-in-out infinite 0.1s;
+}
+
+.animate-trail-3 {
+  animation: trail3 3s ease-in-out infinite 0.2s;
+}
+
+/* Progress bar animation */
+@keyframes progress {
+  0% {
+    width: 0%;
+  }
+  50% {
+    width: 70%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+.animate-progress {
+  animation: progress 2.5s ease-in-out infinite;
+}
+
+/* Gradient Wave Background */
+@keyframes waveGradient1 {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateX(-30%) translateY(-20px) rotate(2deg);
+  }
+}
+
+@keyframes waveGradient2 {
+  0%, 100% {
+    transform: translateX(-30%) translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateX(-50%) translateY(15px) rotate(-2deg);
+  }
+}
+
+@keyframes waveGradient3 {
+  0%, 100% {
+    transform: translateX(-40%) translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateX(-60%) translateY(-10px) rotate(1deg);
+  }
+}
+
+.wave-bg-1 {
+  animation: waveGradient1 12s ease-in-out infinite;
+}
+
+.wave-bg-2 {
+  animation: waveGradient2 15s ease-in-out infinite;
+}
+
+.wave-bg-3 {
+  animation: waveGradient3 18s ease-in-out infinite;
+}
+
+/* Gradient orb animation */
+@keyframes orbFloat {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.3;
+  }
+  33% {
+    transform: translate(30px, -40px) scale(1.1);
+    opacity: 0.5;
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+    opacity: 0.4;
+  }
+}
+
+.animate-orb {
+  animation: orbFloat 10s ease-in-out infinite;
+}
+
+.animate-orb-delay-1 {
+  animation: orbFloat 12s ease-in-out infinite 2s;
+}
+
+.animate-orb-delay-2 {
+  animation: orbFloat 14s ease-in-out infinite 4s;
+}
+
+/* Blob animatsiyasi - kirish sahifasi uchun */
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
+}
+
+.animation-delay-6000 {
+  animation-delay: 6s;
 }

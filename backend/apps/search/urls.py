@@ -6,7 +6,9 @@ from .views import (
     LiveFlightPricesView,
     FlightPriceCalendarView,
     LiveHotelPricesView,
-    APIStatusView
+    APIStatusView,
+    TravelNewsView,
+    AIChatView
 )
 
 router = DefaultRouter()
@@ -19,6 +21,10 @@ urlpatterns = [
     path('flights/calendar/', FlightPriceCalendarView.as_view(), name='flight-price-calendar'),
     path('hotels/live/', LiveHotelPricesView.as_view(), name='live-hotel-prices'),
     path('api-status/', APIStatusView.as_view(), name='api-status'),
+    # Yangiliklar
+    path('news/', TravelNewsView.as_view(), name='travel-news'),
+    # AI Chatbot
+    path('ai-chat/', AIChatView.as_view(), name='ai-chat'),
     # Router URLlari
     path('', include(router.urls)),
 ]

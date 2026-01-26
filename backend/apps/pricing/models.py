@@ -80,3 +80,85 @@ class HotelPrice(models.Model):
 
     def __str__(self):
         return f"{self.hotel_name} ({self.city.name_uz}): ${self.price_per_night_usd}/kecha"
+
+
+class PriceAlert(models.Model):
+    """Narx alert modeli - foydalanuvchilarga narx tushsa xabar berish"""
+
+    email = models.EmailField(
+        verbose_name="Email",
+        help_text="Foydalanuvchi emaili"
+    )
+
+    origin = models.ForeignKey(
+        City,
+        on_delete=models.CASCADE,
+        related_name='price_alerts_from',
+        verbose_name="Boshlang'ich shahar"
+    )
+
+    destination = models.ForeignKey(
+        City,
+        on_delete=models.CASCADE,
+        related_name='price_alerts_to',
+        verbose_name="Manzil shahar"
+    )
+
+    target_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Maqsadli narx (USD)",
+        help_text="Narx bu summadan past bo'lsa xabar yuboriladi"
+    )
+
+    departure_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Jo'nash sanasi",
+        help_text="Aniq sana uchun (optional)"
+    )
+
+    last_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Oxirgi tekshirilgan narx"
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Faolmi",
+        help_text="Alert faolmi"
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Yaratilgan"
+    )
+
+    last_checked = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Oxirgi tekshirilgan vaqt"
+    )
+
+    triggered_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Trigger bo'lgan vaqt",
+        help_text="Narx maqsadga yetganda"
+    )
+
+    class Meta:
+        db_table = 'price_alerts'
+        verbose_name = 'Narx Alert'
+        verbose_name_plural = 'Narx Alertlar'
+        indexes = [
+            models.Index(fields=['email', '-created_at']),
+            models.Index(fields=['is_active', 'last_checked']),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.email}: {self.origin.iata_code} → {self.destination.iata_code} @ ${self.target_price}"

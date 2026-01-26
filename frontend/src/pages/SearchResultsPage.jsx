@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useSearchStore from '../store/searchStore'
 import RouteVariantCard from '../components/RouteVariantCard'
-import TravelMap from '../components/TravelMap'
+import TravelNews from '../components/TravelNews'
 
 function SearchResultsPage() {
   const navigate = useNavigate()
@@ -33,6 +33,11 @@ function SearchResultsPage() {
     selectVariant(variant)
   }
 
+  const handleViewDetails = (variant) => {
+    selectVariant(variant)
+    navigate(`/search/${search.id}/variant/${variant.id}`)
+  }
+
   const handleSaveTrip = () => {
     if (activeVariant) {
       saveTrip({
@@ -45,19 +50,49 @@ function SearchResultsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Animated Gradient Background */}
+      <div className="fixed inset-0 -z-10 overflow-hidden">
+        {/* Background image - Dubai Creek Harbour */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: `url('https://images.unsplash.com/photo-1512632578888-169bbbc64f33?w=1920&q=80')`,
+          }}
+        />
+        {/* Overlay gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-900/70 via-indigo-900/60 to-purple-900/70" />
+
+        {/* Animated wave layers */}
+        <div className="absolute -top-1/2 -left-1/4 w-[200%] h-[200%] wave-bg-1">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-200/30 via-transparent to-indigo-200/30 rounded-full blur-3xl" />
+        </div>
+        <div className="absolute -bottom-1/2 -right-1/4 w-[200%] h-[200%] wave-bg-2">
+          <div className="absolute inset-0 bg-gradient-to-l from-purple-200/30 via-transparent to-pink-200/30 rounded-full blur-3xl" />
+        </div>
+        <div className="absolute top-1/4 left-1/4 w-[150%] h-[150%] wave-bg-3">
+          <div className="absolute inset-0 bg-gradient-to-tr from-cyan-200/20 via-transparent to-blue-200/20 rounded-full blur-3xl" />
+        </div>
+
+        {/* Floating orbs */}
+        <div className="absolute top-20 left-20 w-64 h-64 bg-gradient-to-br from-blue-400/20 to-indigo-500/20 rounded-full blur-3xl animate-orb" />
+        <div className="absolute bottom-40 right-20 w-80 h-80 bg-gradient-to-br from-purple-400/20 to-pink-500/20 rounded-full blur-3xl animate-orb-delay-1" />
+        <div className="absolute top-1/2 left-1/3 w-48 h-48 bg-gradient-to-br from-cyan-400/15 to-blue-500/15 rounded-full blur-3xl animate-orb-delay-2" />
+      </div>
+
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Sarlavha */}
       <div className="mb-8">
         <button
           onClick={() => navigate('/')}
-          className="text-primary-600 hover:text-primary-800 mb-4 flex items-center"
+          className="text-white/80 hover:text-white mb-4 flex items-center"
         >
           ← Yangi qidiruv
         </button>
-        <h1 className="text-3xl font-bold">
+        <h1 className="text-3xl font-bold text-white drop-shadow-lg">
           {search.origin_details?.name_uz} → {search.destination_details?.name_uz}
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-white/80 mt-2">
           {search.departure_date} - {search.return_date} | {search.travelers} kishi | {search.nights} kecha
         </p>
 
@@ -67,11 +102,11 @@ function SearchResultsPage() {
             href={`https://www.aviasales.uz/search/${search.origin_details?.iata_code}${search.departure_date?.replace(/-/g, '').slice(4, 8)}${search.destination_details?.iata_code}1`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+            className="inline-flex items-center text-sm text-cyan-300 hover:text-cyan-100"
           >
             Aviasales.uz da ko'rish →
           </a>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-white/50">
             Narxlar Aviasales.uz dan olinadi
           </span>
         </div>
@@ -80,7 +115,7 @@ function SearchResultsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Variantlar ro'yxati */}
         <div className="lg:col-span-2 space-y-6">
-          <h2 className="text-xl font-semibold">
+          <h2 className="text-xl font-semibold text-white drop-shadow">
             {variants.length} ta variant topildi
           </h2>
 
@@ -92,66 +127,22 @@ function SearchResultsPage() {
                 index={index}
                 onSelect={handleSelectVariant}
                 isSelected={activeVariant?.id === variant.id}
+                onViewDetails={handleViewDetails}
               />
             ))}
           </div>
         </div>
 
-        {/* Xarita va tanlangan variant */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Xarita */}
-          <div className="card">
-            <h3 className="text-lg font-semibold mb-4">Yo'nalish xaritasi</h3>
-            <TravelMap variant={activeVariant} height="300px" />
-          </div>
-
-          {/* Tanlangan variant */}
-          {activeVariant && (
-            <div className="card bg-primary-50">
-              <h3 className="text-lg font-semibold mb-4">Tanlangan variant</h3>
-
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Yo'nalish turi:</span>
-                  <span className="font-medium">{activeVariant.route_type_display}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Parvozlar:</span>
-                  <span className="font-medium">${parseFloat(activeVariant.total_flight_cost).toFixed(0)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Mehmonxonalar:</span>
-                  <span className="font-medium">${parseFloat(activeVariant.total_hotel_cost).toFixed(0)}</span>
-                </div>
-                <div className="flex justify-between text-lg font-bold border-t pt-3">
-                  <span>JAMI:</span>
-                  <span className="text-primary-600">${parseFloat(activeVariant.total_cost).toFixed(0)}</span>
-                </div>
-
-                {parseFloat(activeVariant.savings_percent) > 0 && (
-                  <div className="bg-green-100 rounded-lg p-3 text-center text-green-700">
-                    <span className="icon-3d-success">💰</span> ${parseFloat(activeVariant.savings_amount).toFixed(0)} tejaysiz!
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-6 space-y-3">
-                <button
-                  onClick={() => navigate(`/search/${search.id}/variant/${activeVariant.id}`)}
-                  className="btn btn-primary w-full"
-                >
-                  Tafsilotlarni ko'rish
-                </button>
-                <button
-                  onClick={handleSaveTrip}
-                  className="btn btn-secondary w-full"
-                >
-                  <span className="icon-3d-sm">💾</span> Sayohatni saqlash
-                </button>
-              </div>
+        {/* Sayohat yangiliklari */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-8">
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-6">
+              <h3 className="text-lg font-semibold mb-4">Sayohat yangiliklari</h3>
+              <TravelNews />
             </div>
-          )}
+          </div>
         </div>
+      </div>
       </div>
     </div>
   )

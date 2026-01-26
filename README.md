@@ -1,5 +1,8 @@
 # Blissful Tour - Aqlli Sayohat Optimallashtirish Platformasi
 
+[![CI Status](https://github.com/your-username/blissful-tour/workflows/CI%20-%20Test%20and%20Build/badge.svg)](https://github.com/your-username/blissful-tour/actions)
+[![CD Status](https://github.com/your-username/blissful-tour/workflows/CD%20-%20Deploy%20to%20Production/badge.svg)](https://github.com/your-username/blissful-tour/actions)
+
 Sayohatchilar uchun eng arzon va qulay yo'nalishlarni topuvchi platforma.
 
 ## Loyiha strukturasi
@@ -102,6 +105,41 @@ docker-compose up -d
 - React Query
 - Zustand
 - React Leaflet
+
+## CI/CD Pipeline
+
+Loyiha GitHub Actions bilan avtomatik test va deploy qilinadi:
+
+- **Continuous Integration (CI)**: Har bir pull request va push avtomatik test qilinadi
+- **Continuous Deployment (CD)**: Main branchga push production serverga avtomatik deploy qilinadi
+
+Batafsil ma'lumot uchun [CI-CD.md](CI-CD.md) faylini o'qing.
+
+## Deployment
+
+### Local Development
+
+```bash
+docker-compose up -d
+```
+
+### Production Deployment
+
+```bash
+# Manual deployment
+docker-compose -f docker-compose.prod.yml up -d
+
+# Docker Hub dan (CI/CD orqali)
+docker-compose -f docker-compose.hub.yml up -d
+```
+
+Batafsil qo'llanma: [DEPLOYMENT.md](DEPLOYMENT.md)
+
+## Hujjatlar
+
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Production deployment qo'llanmasi
+- [CI-CD.md](CI-CD.md) - GitHub Actions CI/CD sozlash va ishlatish
+- [FULL_TEST_REPORT.md](FULL_TEST_REPORT.md) - To'liq test hisoboti
 
 ## Muallif
 

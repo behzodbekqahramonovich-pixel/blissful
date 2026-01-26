@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-blissful_tour}
+      POSTGRES_USER: ${POSTGRES_USER:-blissful}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blissful123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - blissful-network
+    restart: unless-stopped
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    networks:
+      - blissful-network
+    restart: unless-stopped
+
+  # Django Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DEBUG=${DEBUG:-False}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-blissful}:${POSTGRES_PASSWORD:-blissful123}@db:5432/${POSTGRES_DB:-blissful_tour}
+      - REDIS_URL=redis://redis:6379/0
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
+    depends_on:
+      - db
+      - redis
+    networks:
+      - blissful-network
+    restart: unless-stopped
+    volumes:
+      - static_volume:/app/staticfiles
+
+  # React Frontend with Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - blissful-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  static_volume:
+
+networks:
+  blissful-network:
+    driver: bridge

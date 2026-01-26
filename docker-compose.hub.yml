@@ -1,0 +1,66 @@
+version: '3.8'
+
+# Docker Hub dan imagelerni ishlatadigan production versiya
+# GitHub Actions orqali deploy qilishda ishlatiladi
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-blissful_tour}
+      POSTGRES_USER: ${POSTGRES_USER:-blissful}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blissful123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - blissful-network
+    restart: unless-stopped
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    networks:
+      - blissful-network
+    restart: unless-stopped
+
+  # Django Backend (from Docker Hub)
+  backend:
+    image: ${DOCKER_USERNAME}/blissful-tour-backend:latest
+    environment:
+      - DEBUG=${DEBUG:-False}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-blissful}:${POSTGRES_PASSWORD:-blissful123}@db:5432/${POSTGRES_DB:-blissful_tour}
+      - REDIS_URL=redis://redis:6379/0
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - TRAVELPAYOUTS_TOKEN=${TRAVELPAYOUTS_TOKEN}
+      - RAPIDAPI_KEY=${RAPIDAPI_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - db
+      - redis
+    networks:
+      - blissful-network
+    restart: unless-stopped
+    volumes:
+      - static_volume:/app/staticfiles
+
+  # React Frontend (from Docker Hub)
+  frontend:
+    image: ${DOCKER_USERNAME}/blissful-tour-frontend:latest
+    ports:
+      - "80:80"
+      - "443:443"  # HTTPS uchun
+    depends_on:
+      - backend
+    networks:
+      - blissful-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  static_volume:
+
+networks:
+  blissful-network:
+    driver: bridge

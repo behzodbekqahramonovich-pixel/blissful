@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
 import RegisterModal from './RegisterModal'
 import LoginModal from './LoginModal'
-import AIAssistant from './AIAssistant'
+const AIAssistant = lazy(() => import('./AIAssistant'))  // react-markdown faqat shu yerda
 import useAuthStore from '../store/authStore'
 
 function Layout({ children }) {
@@ -407,7 +407,7 @@ function Layout({ children }) {
       />
 
       {/* AI Assistant */}
-      <AIAssistant />
+      <Suspense fallback={null}><AIAssistant /></Suspense>
     </div>
   )
 }

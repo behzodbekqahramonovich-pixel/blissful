@@ -120,6 +120,12 @@ function SearchResultsPage() {
           </h2>
 
           <div className="space-y-4">
+            {variants.length === 0 && (
+              <div className="bg-white rounded-xl p-8 text-center text-gray-600">
+                Bu sanalar uchun real narx topilmadi. Boshqa sana yoki shaharni sinab ko'ring.
+              </div>
+            )}
+
             {variants.map((variant, index) => (
               <RouteVariantCard
                 key={variant.id}

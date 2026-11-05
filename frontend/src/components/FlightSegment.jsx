@@ -9,9 +9,6 @@ function FlightSegment({ segment }) {
     duration,
     date,
     type,
-    departure_time,
-    arrival_time,
-    flight_number,
     link,
   } = segment
 
@@ -86,7 +83,6 @@ function FlightSegment({ segment }) {
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-800">{from}</div>
               <div className="text-xs text-gray-500 truncate max-w-[80px]">{from_name}</div>
-              <div className="text-sm font-semibold text-primary-600 mt-1">{departure_time || '08:00'}</div>
             </div>
 
             {/* Flight line */}
@@ -106,9 +102,6 @@ function FlightSegment({ segment }) {
             <div className="text-center">
               <div className="text-2xl font-bold text-gray-800">{to}</div>
               <div className="text-xs text-gray-500 truncate max-w-[80px]">{to_name}</div>
-              <div className="text-sm font-semibold text-primary-600 mt-1">
-                {arrival_time || calculateArrival(departure_time || '08:00', duration)}
-              </div>
             </div>
           </div>
         </div>
@@ -118,8 +111,6 @@ function FlightSegment({ segment }) {
       <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <span>{airline}</span>
-          {flight_number && <span className="text-gray-300">|</span>}
-          {flight_number && <span>{flight_number}</span>}
         </div>
         {link && (
           <a
@@ -134,14 +125,6 @@ function FlightSegment({ segment }) {
       </div>
     </div>
   )
-}
-
-function calculateArrival(departure, durationMinutes) {
-  const [hours, minutes] = departure.split(':').map(Number)
-  const totalMinutes = hours * 60 + minutes + durationMinutes
-  const arrivalHours = Math.floor(totalMinutes / 60) % 24
-  const arrivalMins = totalMinutes % 60
-  return `${String(arrivalHours).padStart(2, '0')}:${String(arrivalMins).padStart(2, '0')}`
 }
 
 export default FlightSegment

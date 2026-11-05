@@ -12,10 +12,8 @@ from .serializers import (
     TravelSearchSerializer,
     TravelSearchCreateSerializer,
     RouteVariantSerializer,
-    SearchResultSerializer
 )
 from apps.destinations.models import City
-from services.route_finder import RouteFinder
 from services.route_optimizer import RouteOptimizer
 from services.external_apis import travelpayouts_api, booking_api
 from services.popular_routes_scraper import popular_routes_scraper
@@ -66,19 +64,11 @@ class TravelSearchViewSet(viewsets.ModelViewSet):
 
         # Optimallashtirish rejimini olish
         optimization_mode = request.data.get('optimization_mode', 'balanced')
-        use_optimizer = request.data.get('use_optimizer', True)
-        use_live_prices = request.data.get('use_live_prices', True)  # Har doim real narxlar
+        use_live_prices = request.data.get('use_live_prices', True)
 
-        if use_optimizer:
-            # Yangi ilg'or optimizer ishlatish
-            optimizer = RouteOptimizer(search, use_live_prices=use_live_prices)
-            variants = optimizer.find_optimal_route(mode=optimization_mode)
-            saved_variants = optimizer.save_variants(variants)
-        else:
-            # Eski finder ishlatish
-            finder = RouteFinder(search)
-            variants = finder.find_all_routes()
-            saved_variants = finder.save_variants(variants)
+        optimizer = RouteOptimizer(search, use_live_prices=use_live_prices)
+        variants = optimizer.find_optimal_route(mode=optimization_mode)
+        saved_variants = optimizer.save_variants(variants)
 
         # Tavsiya qilingan variant
         recommended = next(

@@ -110,7 +110,6 @@ function SearchForm({ compact = false }) {
         hotel_stars: hotelStars,
         optimization_mode: optimizationMode,
         budget_max: budgetMax ? parseFloat(budgetMax) : null,
-        use_optimizer: true,
         use_live_prices: useLivePrices,
       }
 

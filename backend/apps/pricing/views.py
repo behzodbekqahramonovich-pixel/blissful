@@ -66,15 +66,10 @@ class PriceMatrixViewSet(viewsets.ViewSet):
         """Barcha yo'nalishlar bo'yicha eng arzon narxlar"""
         cities = City.objects.filter(is_hub=True).values_list('iata_code', flat=True)
 
-        matrix = {}
-        for origin in cities:
-            matrix[origin] = {}
-            for dest in cities:
-                if origin != dest:
-                    min_price = FlightPrice.objects.filter(
-                        origin__iata_code=origin,
-                        destination__iata_code=dest
-                    ).aggregate(min_price=Min('price_usd'))['min_price']
-                    matrix[origin][dest] = float(min_price) if min_price else None
-
+        cheapest = {
+            (r['origin__iata_code'], r['destination__iata_code']): float(r['p'])
+            for r in FlightPrice.objects.filter(origin__is_hub=True, destination__is_hub=True)
+            .values('origin__iata_code', 'destination__iata_code').annotate(p=Min('price_usd'))
+        }
+        matrix = {o: {d: cheapest.get((o, d)) for d in cities if d != o} for o in cities}
         return Response(matrix)

@@ -9,6 +9,9 @@ import threading
 import time
 import re
 import html
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class RSSFeedService:
@@ -92,123 +95,6 @@ class RSSFeedService:
         self._cache_time: Optional[datetime] = None
         self._cache_duration = timedelta(minutes=cache_duration_minutes)
         self._lock = threading.Lock()
-        self._fallback_news = self._get_fallback_news()
-
-    def _get_fallback_news(self) -> List[Dict]:
-        """Zaxira yangiliklar (RSS da kam yangilik bo'lsa)"""
-        today = datetime.now().strftime("%Y-%m-%d")
-        return [
-            {
-                'id': 101,
-                'title': "Dubai 2025 yilda yangi turistik zonani ochadi",
-                'description': "Dubai Creek Harbour'da yangi dam olish maskani ochildi. 500 dan ortiq mehmonxona va restoranlar.",
-                'image': "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400&h=250&fit=crop",
-                'date': today,
-                'category': "Yangilik",
-                'source': "Blissful Tour",
-                'url': None
-            },
-            {
-                'id': 102,
-                'title': "Turkiyaga vizasiz sayohat muddati uzaytirildi",
-                'description': "O'zbekiston fuqarolari uchun Turkiyaga 90 kunlik vizasiz rejim 2026 yilgacha uzaytirildi.",
-                'image': "https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?w=400&h=250&fit=crop",
-                'date': today,
-                'category': "Viza",
-                'source': "Blissful Tour",
-                'url': None
-            },
-            {
-                'id': 103,
-                'title': "Toshkent-Istanbul $99 dan boshlanadi",
-                'description': "Qishki mavsumda Toshkent-Istanbul yo'nalishida maxsus aksiya. Chiptalar cheklangan.",
-                'image': "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400&h=250&fit=crop",
-                'date': today,
-                'category': "Aksiya",
-                'source': "Blissful Tour",
-                'url': None
-            },
-            {
-                'id': 104,
-                'title': "Samarqand - eng yaxshi turistik shaharlar ro'yxatida",
-                'description': "Lonely Planet nashri Samarqandni 2025 yilning top-10 turistik shaharlari ro'yxatiga kiritdi.",
-                'image': "https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?w=400&h=250&fit=crop",
-                'date': today,
-                'category': "Reyting",
-                'source': "Blissful Tour",
-                'url': None
-            },
-            {
-                'id': 105,
-                'title': "Malayziyaga vizasiz kirish joriy etildi",
-                'description': "O'zbekiston fuqarolari uchun Malayziyaga 30 kunlik vizasiz kirish imkoniyati yaratildi.",
-                'image': "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=400&h=250&fit=crop",
-                'date': today,
-                'category': "Viza",
-                'source': "Blissful Tour",
-                'url': None
-            },
-            {
-                'id': 106,
-                'title': "Toshkent-Dubay yo'nalishida yangi reyslar",
-                'description': "Uzbekistan Airways Toshkent-Dubay yo'nalishida kundalik reyslarni boshladi.",
-                'image': "https://images.unsplash.com/photo-1569154941061-e231b4725ef1?w=400&h=250&fit=crop",
-                'date': today,
-                'category': "Transport",
-                'source': "Blissful Tour",
-                'url': None
-            },
-            {
-                'id': 107,
-                'title': "Antalya mehmonxonalarida 30% chegirma",
-                'description': "Qishki mavsumda Antalya kurortlarida maxsus chegirma aksiyasi boshlandi.",
-                'image': "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400&h=250&fit=crop",
-                'date': today,
-                'category': "Aksiya",
-                'source': "Blissful Tour",
-                'url': None
-            },
-            {
-                'id': 108,
-                'title': "Tailand vizasiz rejimni uzaytirdi",
-                'description': "Tailand O'zbekiston fuqarolari uchun 30 kunlik vizasiz rejimni 2026 yilgacha uzaytirdi.",
-                'image': "https://images.unsplash.com/photo-1552465011-b4e21bf6e79a?w=400&h=250&fit=crop",
-                'date': today,
-                'category': "Viza",
-                'source': "Blissful Tour",
-                'url': None
-            },
-            {
-                'id': 109,
-                'title': "Toshkentda yangi Hilton mehmonxonasi ochildi",
-                'description': "Hilton Garden Inn Toshkent shahar markazida o'z eshiklarini ochdi. 200 ta zamonaviy xona.",
-                'image': "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&h=250&fit=crop",
-                'date': today,
-                'category': "Mehmonxona",
-                'source': "Blissful Tour",
-                'url': None
-            },
-            {
-                'id': 110,
-                'title': "Booking.com O'zbekiston bo'yicha eng yaxshi mehmonxonalarni e'lon qildi",
-                'description': "2025 yil uchun Traveller Review Awards g'oliblari aniqlandi. Samarqand va Buxoro yetakchi.",
-                'image': "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=400&h=250&fit=crop",
-                'date': today,
-                'category': "Reyting",
-                'source': "Blissful Tour",
-                'url': None
-            },
-            {
-                'id': 111,
-                'title': "Buxoroda yangi 5 yulduzli resort ochildi",
-                'description': "Buxoro Old City Resort 5 yulduzli mehmonxona sifatida faoliyatini boshladi. Spa va basseyn mavjud.",
-                'image': "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?w=400&h=250&fit=crop",
-                'date': today,
-                'category': "Mehmonxona",
-                'source': "Blissful Tour",
-                'url': None
-            },
-        ]
 
     def _clean_html(self, text: str) -> str:
         """HTML teglarni tozalash"""
@@ -331,7 +217,7 @@ class RSSFeedService:
                 })
 
         except Exception as e:
-            print(f"RSS xatolik ({feed_config['name']}): {e}")
+            logger.warning(f"RSS xatolik ({feed_config['name']}): {e}")
 
         return news
 
@@ -352,36 +238,29 @@ class RSSFeedService:
                 if datetime.now() - self._cache_time < self._cache_duration:
                     return self._cache[:limit]
 
-            # Barcha feed'lardan yangiliklar olish
-            all_news = []
-            for feed_config in self.RSS_FEEDS:
-                all_news.extend(self._fetch_feed(feed_config))
+        # Barcha feed'lardan yangiliklar olish
+        all_news = []
+        for feed_config in self.RSS_FEEDS:
+            all_news.extend(self._fetch_feed(feed_config))
 
-            # Agar yangilik kam bo'lsa, zaxira yangiliklar qo'shish
-            if len(all_news) < 5:
-                fallback = self._fallback_news.copy()
-                for item in fallback:
-                    item['relevance_score'] = 5  # Zaxira yangiliklar uchun
-                all_news.extend(fallback)
+        # Relevantlik va sanaga ko'ra tartiblash
+        all_news.sort(key=lambda x: (x.get('relevance_score', 0), x['date']), reverse=True)
 
-            # Relevantlik va sanaga ko'ra tartiblash
-            all_news.sort(key=lambda x: (x.get('relevance_score', 0), x['date']), reverse=True)
+        # Dublikatlarni olib tashlash (sarlavha bo'yicha)
+        seen_titles = set()
+        unique_news = []
+        for item in all_news:
+            title_key = item['title'][:50].lower()
+            if title_key not in seen_titles:
+                seen_titles.add(title_key)
+                item['id'] = len(unique_news) + 1
+                unique_news.append(item)
 
-            # Dublikatlarni olib tashlash (sarlavha bo'yicha)
-            seen_titles = set()
-            unique_news = []
-            for item in all_news:
-                title_key = item['title'][:50].lower()
-                if title_key not in seen_titles:
-                    seen_titles.add(title_key)
-                    item['id'] = len(unique_news) + 1
-                    unique_news.append(item)
-
-            # Keshga saqlash
+        with self._lock:
             self._cache = unique_news
             self._cache_time = datetime.now()
 
-            return unique_news[:limit]
+        return unique_news[:limit]
 
     def get_cache_status(self) -> Dict:
         """Kesh holati"""

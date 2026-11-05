@@ -301,72 +301,6 @@ class AviasalesAPI:
         departure = flight.get('departure_at', '')[:10].replace('-', '')
         return f"https://www.aviasales.uz/search/{origin}{departure}{destination}1"
 
-    def _get_fallback_flights(self, origin: str, destination: str, departure_date: date) -> List[Dict]:
-        """API ishlamasa, taxminiy narxlar (O'zbekiston yo'nalishlari uchun)"""
-        base_prices = {
-            # Toshkentdan
-            ('TAS', 'IST'): (250, 'Turkish Airlines', 300),
-            ('TAS', 'DXB'): (200, 'Flydubai', 270),
-            ('TAS', 'DOH'): (220, 'Qatar Airways', 300),
-            ('TAS', 'BKK'): (350, 'Uzbekistan Airways', 420),
-            ('TAS', 'KUL'): (400, 'AirAsia', 480),
-            ('TAS', 'CAI'): (300, 'Egyptair', 360),
-            ('TAS', 'SVO'): (150, 'Aeroflot', 240),
-            ('TAS', 'LED'): (180, 'Uzbekistan Airways', 270),
-            # Dubaydan
-            ('DXB', 'IST'): (120, 'Emirates', 180),
-            ('DXB', 'DOH'): (60, 'Emirates', 90),
-            ('DXB', 'BKK'): (220, 'Emirates', 360),
-            ('DXB', 'KUL'): (250, 'Emirates', 360),
-            ('DXB', 'SIN'): (280, 'Emirates', 360),
-            ('DXB', 'CAI'): (150, 'Emirates', 240),
-            # Istanbuldan
-            ('IST', 'DXB'): (120, 'Turkish Airlines', 180),
-            ('IST', 'DOH'): (140, 'Turkish Airlines', 210),
-            ('IST', 'CAI'): (100, 'Turkish Airlines', 150),
-            # Dohadan
-            ('DOH', 'IST'): (140, 'Qatar Airways', 210),
-            ('DOH', 'BKK'): (250, 'Qatar Airways', 390),
-            ('DOH', 'CAI'): (130, 'Qatar Airways', 180),
-            # Bangkokdan
-            ('BKK', 'KUL'): (60, 'AirAsia', 120),
-            ('BKK', 'SIN'): (80, 'AirAsia', 150),
-            # Kuala-Lumpurdan
-            ('KUL', 'SIN'): (40, 'AirAsia', 60),
-        }
-
-        key = (origin, destination)
-        reverse_key = (destination, origin)
-
-        if key in base_prices:
-            price, airline, duration = base_prices[key]
-        elif reverse_key in base_prices:
-            price, airline, duration = base_prices[reverse_key]
-        else:
-            price, airline, duration = 200, 'Aviakompaniya', 240
-
-        logger.info(f"Aviasales Fallback: {origin}->{destination} = ${price}")
-
-        return [{
-            'origin': origin,
-            'destination': destination,
-            'price': float(price),
-            'airline': airline,
-            'departure_at': departure_date.strftime('%Y-%m-%d'),
-            'duration': duration,
-            'transfers': 0,
-            'link': f"https://www.aviasales.uz/search/{origin}{departure_date.strftime('%d%m')}{destination}1",
-        }]
-
-    def get_cheapest_price(self, origin: str, destination: str, departure_date: date) -> Optional[Dict]:
-        """Eng arzon parvoz narxini olish"""
-        flights = self.search_flights(origin, destination, departure_date)
-        if flights:
-            cheapest = min(flights, key=lambda x: x['price'])
-            logger.info(f"Aviasales: {origin}->{destination} eng arzon: ${cheapest['price']} ({cheapest['airline']})")
-            return cheapest
-        return None
-
     def get_prices_calendar(self, origin: str, destination: str, month: str) -> Dict[str, float]:
         """Oylik narxlar kalendarini olish"""
         try:
@@ -390,8 +324,6 @@ class AviasalesAPI:
         return {}
 
 
-# Backwards compatibility
-TravelpayoutsAPI = AviasalesAPI
 
 
 class BookingComAPI:
@@ -675,21 +607,7 @@ class BookingComAPI:
             'image_url': '',
         }]
 
-    def get_cheapest_hotel(
-        self,
-        city_name: str,
-        checkin_date: date,
-        checkout_date: date,
-        min_stars: int = 3
-    ) -> Optional[Dict]:
-        """Eng arzon mehmonxonani olish"""
-        hotels = self.search_hotels(city_name, checkin_date, checkout_date, min_stars=min_stars)
-        if hotels:
-            return min(hotels, key=lambda x: x['price_per_night'])
-        return None
-
-
 # API instanslari
-travelpayouts_api = TravelpayoutsAPI()
+travelpayouts_api = AviasalesAPI()
 booking_api = BookingComAPI()
 

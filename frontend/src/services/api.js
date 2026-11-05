@@ -20,6 +20,29 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+// 401 da refresh token bilan yangilab, so'rovni qaytarish
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config
+    if (error.response?.status !== 401 || originalRequest._retry) return Promise.reject(error)
+    originalRequest._retry = true
+
+    const { refreshToken, setTokens, logout } = useAuthStore.getState()
+    try {
+      if (!refreshToken) throw error
+      const { data } = await axios.post(`${API_BASE_URL}/auth/refresh/`, { refresh: refreshToken })
+      setTokens(data.access, refreshToken)
+      originalRequest.headers.Authorization = `Bearer ${data.access}`
+      return api(originalRequest)
+    } catch (refreshError) {
+      logout()  // AuthRequired login ekranini o'zi ko'rsatadi
+      if (window.location.pathname.startsWith('/admin')) window.location.href = '/admin/login'
+      return Promise.reject(refreshError)
+    }
+  }
+)
+
 // Destinations API
 export const destinationsApi = {
   // Barcha shaharlar

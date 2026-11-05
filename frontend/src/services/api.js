@@ -1,4 +1,5 @@
 import axios from 'axios'
+import useAuthStore from '../store/authStore'
 
 // Production da Railway URL, development da proxy
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
@@ -8,6 +9,15 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+})
+
+// Har so'rovga JWT token qo'shish (qidiruv API endi login talab qiladi)
+api.interceptors.request.use((config) => {
+  const { accessToken } = useAuthStore.getState()
+  if (accessToken && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${accessToken}`
+  }
+  return config
 })
 
 // Destinations API

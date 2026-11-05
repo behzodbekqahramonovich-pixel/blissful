@@ -47,3 +47,6 @@ Thumbs.db
 *.temp
 temp_docx/
 *.zip
+
+# Secrets
+key.txt

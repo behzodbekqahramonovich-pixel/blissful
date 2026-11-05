@@ -349,6 +349,9 @@ class AgencyBookingsView(APIView):
 
         serializer = BookingSerializer(data=request.data)
         if serializer.is_valid():
+            client = serializer.validated_data.get('client')
+            if client and client.agency_id != request.user.profile.id:
+                return Response({'error': 'Mijoz topilmadi'}, status=status.HTTP_404_NOT_FOUND)
             booking = serializer.save(user=request.user)
             # Update total bookings count
             request.user.profile.total_bookings = Booking.objects.filter(

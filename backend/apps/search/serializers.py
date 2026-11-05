@@ -31,7 +31,6 @@ class TravelSearchCreateSerializer(serializers.Serializer):
     return_date = serializers.DateField()
     travelers = serializers.IntegerField(default=1, min_value=1, max_value=10)
     include_transit = serializers.BooleanField(default=True)
-    max_stops = serializers.IntegerField(default=2, min_value=0, max_value=3)
     hotel_stars = serializers.IntegerField(default=3, min_value=1, max_value=5)
     budget_max = serializers.DecimalField(
         max_digits=10,
@@ -91,9 +90,3 @@ class RouteVariantSerializer(serializers.ModelSerializer):
             'score', 'details'
         ]
 
-
-class SearchResultSerializer(serializers.Serializer):
-    """Qidiruv natijasi serializeri"""
-    search = TravelSearchSerializer()
-    variants = RouteVariantSerializer(many=True)
-    recommended = RouteVariantSerializer(allow_null=True)

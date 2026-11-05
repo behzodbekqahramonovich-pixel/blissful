@@ -95,21 +95,7 @@ function AuthRequired({ children }) {
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="flex gap-8 mt-12 pt-12 border-t border-white/10">
-              <div>
-                <div className="text-3xl font-bold text-white">50K+</div>
-                <div className="text-gray-500 text-sm">Foydalanuvchilar</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-white">100+</div>
-                <div className="text-gray-500 text-sm">Mamlakatlar</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-white">4.9</div>
-                <div className="text-gray-500 text-sm">Reyting</div>
-              </div>
-            </div>
+            {/* Stats - vaqtincha yashirilgan */}
           </div>
 
           {/* Right Side - Login Card */}

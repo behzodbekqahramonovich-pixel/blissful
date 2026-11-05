@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import api from '../services/api'
 import { motion, AnimatePresence } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -42,17 +43,7 @@ function AIAssistant() {
 
     try {
       // Real AI API ga so'rov yuborish
-      const response = await fetch('http://localhost:8000/api/v1/search/ai-chat/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: userMessage.text
-        })
-      })
-
-      const data = await response.json()
+      const { data } = await api.post('/search/ai-chat/', { message: userMessage.text })
 
       const aiMessage = {
         id: Date.now(),

@@ -1,70 +1,7 @@
-import axios from 'axios'
-import useAuthStore from '../store/authStore'
+import api from './api'
 
-const API_BASE_URL = '/api/v1'
-
-// Create axios instance for admin API
-const adminApi = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-// Request interceptor - add auth token to requests
-adminApi.interceptors.request.use(
-  (config) => {
-    const { accessToken } = useAuthStore.getState()
-    if (accessToken) {
-      config.headers.Authorization = `Bearer ${accessToken}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-// Response interceptor - handle token refresh on 401
-adminApi.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config
-
-    // If 401 and not already retrying
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true
-
-      const { refreshToken, setTokens, logout } = useAuthStore.getState()
-
-      if (refreshToken) {
-        try {
-          // Try to refresh the token
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh/`, {
-            refresh: refreshToken
-          })
-          const { access } = response.data
-
-          // Update tokens in store
-          setTokens(access, refreshToken)
-
-          // Retry original request with new token
-          originalRequest.headers.Authorization = `Bearer ${access}`
-          return adminApi(originalRequest)
-        } catch (refreshError) {
-          // Refresh failed - logout user
-          logout()
-          window.location.href = '/admin/login'
-          return Promise.reject(refreshError)
-        }
-      } else {
-        // No refresh token - logout
-        logout()
-        window.location.href = '/admin/login'
-      }
-    }
-
-    return Promise.reject(error)
-  }
-)
+// Bitta umumiy klient: token va 401 da yangilash api.js da
+const adminApi = api
 
 // Auth API
 export const authApi = {

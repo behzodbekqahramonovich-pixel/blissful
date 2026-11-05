@@ -15,7 +15,6 @@ import logging
 from decimal import Decimal
 from datetime import timedelta, datetime
 from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.db.models import Min, Avg, Q
 from apps.destinations.models import City
@@ -27,38 +26,6 @@ logger = logging.getLogger(__name__)
 
 # Parallel API chaqiruvlar uchun thread pool
 MAX_WORKERS = 10  # Bir vaqtda maksimum API chaqiruvlar soni
-
-
-@dataclass
-class FlightNode:
-    """Parvoz ma'lumotlari"""
-    origin: str
-    destination: str
-    price: float
-    duration: int  # daqiqalarda
-    airline: str
-    departure_time: Optional[str] = None
-
-
-@dataclass
-class RouteNode:
-    """Marshrut nuqtasi"""
-    city_code: str
-    city_name: str
-    arrival_date: Optional[datetime] = None
-    departure_date: Optional[datetime] = None
-    nights: int = 0
-    hotel_cost: float = 0
-
-
-@dataclass(order=True)
-class PriorityItem:
-    """Dijkstra uchun priority queue elementi"""
-    priority: float
-    city: str = field(compare=False)
-    path: List[str] = field(compare=False)
-    total_cost: float = field(compare=False)
-    total_time: int = field(compare=False)
 
 
 class RouteOptimizer:
@@ -467,8 +434,9 @@ class RouteOptimizer:
         self._calculate_savings(variants)
 
         # Baholash va tartiblash
+        cheapest = min((v['total_cost'] for v in variants), default=0)
         for variant in variants:
-            variant['score'] = self._calculate_advanced_score(variant, mode)
+            variant['score'] = self._calculate_advanced_score(variant, mode, cheapest)
 
         variants.sort(key=lambda x: x['score'], reverse=True)
 
@@ -562,9 +530,6 @@ class RouteOptimizer:
                 'type': 'outbound' if i == 0 else 'transit',
                 'data_source': flight_info.get('data_source', 'unknown'),
                 'link': flight_info.get('link', ''),
-                'departure_time': flight_info.get('departure_time', '08:00'),
-                'arrival_time': flight_info.get('arrival_time', '12:00'),
-                'flight_number': flight_info.get('flight_number', ''),
             }
             segments.append(segment)
             total_flight_cost += flight_info['price']
@@ -597,9 +562,6 @@ class RouteOptimizer:
             'type': 'inbound',
             'data_source': return_flight.get('data_source', 'unknown'),
             'link': return_flight.get('link', ''),
-            'departure_time': return_flight.get('departure_time', '10:00'),
-            'arrival_time': return_flight.get('arrival_time', '14:00'),
-            'flight_number': return_flight.get('flight_number', ''),
         })
         total_flight_cost += return_flight['price']
         total_duration += return_flight['duration']
@@ -742,9 +704,6 @@ class RouteOptimizer:
                         'type': 'outbound',
                         'data_source': outbound.get('data_source', 'unknown'),
                         'link': outbound.get('link', ''),
-                        'departure_time': outbound.get('departure_time', '08:00'),
-                        'arrival_time': outbound.get('arrival_time', '12:00'),
-                        'flight_number': outbound.get('flight_number', ''),
                     },
                     {
                         'from': self.destination.iata_code,
@@ -758,9 +717,6 @@ class RouteOptimizer:
                         'type': 'inbound',
                         'data_source': inbound.get('data_source', 'unknown'),
                         'link': inbound.get('link', ''),
-                        'departure_time': inbound.get('departure_time', '10:00'),
-                        'arrival_time': inbound.get('arrival_time', '14:00'),
-                        'flight_number': inbound.get('flight_number', ''),
                     }
                 ],
                 'hotels': [{
@@ -859,9 +815,6 @@ class RouteOptimizer:
                         'type': 'outbound',
                         'data_source': seg1.get('data_source', 'unknown'),
                         'link': seg1.get('link', ''),
-                        'departure_time': seg1.get('departure_time', '06:00'),
-                        'arrival_time': seg1.get('arrival_time', '10:00'),
-                        'flight_number': seg1.get('flight_number', ''),
                     },
                     {
                         'from': hub_code,
@@ -875,9 +828,6 @@ class RouteOptimizer:
                         'type': 'transit',
                         'data_source': seg2.get('data_source', 'unknown'),
                         'link': seg2.get('link', ''),
-                        'departure_time': seg2.get('departure_time', '14:00'),
-                        'arrival_time': seg2.get('arrival_time', '18:00'),
-                        'flight_number': seg2.get('flight_number', ''),
                     },
                     {
                         'from': self.destination.iata_code,
@@ -891,9 +841,6 @@ class RouteOptimizer:
                         'type': 'inbound',
                         'data_source': seg3.get('data_source', 'unknown'),
                         'link': seg3.get('link', ''),
-                        'departure_time': seg3.get('departure_time', '10:00'),
-                        'arrival_time': seg3.get('arrival_time', '14:00'),
-                        'flight_number': seg3.get('flight_number', ''),
                     }
                 ],
                 'hotels': [
@@ -949,20 +896,6 @@ class RouteOptimizer:
                     break
 
         return variants
-
-    def _estimate_multi_city_cost(self, hub1: str, hub2: str) -> float:
-        """Ko'p shaharli marshrut narxini taxmin qilish"""
-        cost = 0
-        seg1 = self._get_flight_info(self.origin.iata_code, hub1, self.departure_date)
-        seg2 = self._get_flight_info(hub1, hub2, self.departure_date)
-        seg3 = self._get_flight_info(hub2, self.destination.iata_code, self.departure_date)
-        seg4 = self._get_flight_info(self.destination.iata_code, self.origin.iata_code, self.return_date)
-
-        if not seg1 or not seg2 or not seg3 or not seg4:
-            return float('inf')  # Juda katta narx qaytarish
-
-        cost = seg1['price'] + seg2['price'] + seg3['price'] + seg4['price']
-        return cost
 
     def _calculate_multi_city_variant(self, hub1: str, hub2: str) -> Optional[Dict]:
         """Ko'p shaharli variant hisoblash"""
@@ -1021,9 +954,6 @@ class RouteOptimizer:
                         'type': 'outbound',
                         'data_source': seg1.get('data_source', 'unknown'),
                         'link': seg1.get('link', ''),
-                        'departure_time': seg1.get('departure_time', '06:00'),
-                        'arrival_time': seg1.get('arrival_time', '10:00'),
-                        'flight_number': seg1.get('flight_number', ''),
                     },
                     {
                         'from': hub1,
@@ -1037,9 +967,6 @@ class RouteOptimizer:
                         'type': 'transit',
                         'data_source': seg2.get('data_source', 'unknown'),
                         'link': seg2.get('link', ''),
-                        'departure_time': seg2.get('departure_time', '11:00'),
-                        'arrival_time': seg2.get('arrival_time', '14:00'),
-                        'flight_number': seg2.get('flight_number', ''),
                     },
                     {
                         'from': hub2,
@@ -1053,9 +980,6 @@ class RouteOptimizer:
                         'type': 'transit',
                         'data_source': seg3.get('data_source', 'unknown'),
                         'link': seg3.get('link', ''),
-                        'departure_time': seg3.get('departure_time', '15:00'),
-                        'arrival_time': seg3.get('arrival_time', '19:00'),
-                        'flight_number': seg3.get('flight_number', ''),
                     },
                     {
                         'from': self.destination.iata_code,
@@ -1069,9 +993,6 @@ class RouteOptimizer:
                         'type': 'inbound',
                         'data_source': seg4.get('data_source', 'unknown'),
                         'link': seg4.get('link', ''),
-                        'departure_time': seg4.get('departure_time', '10:00'),
-                        'arrival_time': seg4.get('arrival_time', '14:00'),
-                        'flight_number': seg4.get('flight_number', ''),
                     }
                 ],
                 'hotels': [
@@ -1269,52 +1190,8 @@ class RouteOptimizer:
         return 240
 
     def _generate_flight_times(self, origin: str, dest: str, api_duration: int) -> Dict:
-        """Parvoz vaqtlarini generatsiya qilish"""
-        import random
-
-        # Haqiqiy parvoz davomiyligini olish (API qiymati noto'g'ri bo'lishi mumkin)
-        duration = self._get_real_flight_duration(origin, dest)
-
-        # Uchish vaqtlari (odatiy parvoz vaqtlari)
-        departure_hours = [6, 7, 8, 9, 10, 11, 14, 15, 16, 18, 20]
-        dep_hour = random.choice(departure_hours)
-        dep_minute = random.choice([0, 15, 30, 45])
-
-        departure_time = f"{dep_hour:02d}:{dep_minute:02d}"
-
-        # Qo'nish vaqtini hisoblash
-        total_minutes = dep_hour * 60 + dep_minute + duration
-        arr_hour = (total_minutes // 60) % 24
-        arr_minute = total_minutes % 60
-        arrival_time = f"{arr_hour:02d}:{arr_minute:02d}"
-
-        # Duration ni ham qaytarish (to'g'rilangan)
-        corrected_duration = duration
-
-        # Reys raqami
-        airline_codes = {
-            'Turkish Airlines': 'TK',
-            'Emirates': 'EK',
-            'Qatar Airways': 'QR',
-            'Uzbekistan Airways': 'HY',
-            'Lufthansa': 'LH',
-            'British Airways': 'BA',
-            'Air France': 'AF',
-            'Aeroflot': 'SU',
-            'Singapore Airlines': 'SQ',
-            'ANA': 'NH',
-            'Korean Air': 'KE',
-        }
-        airline = self._get_airline_for_route(origin, dest)
-        code = airline_codes.get(airline, 'XX')
-        flight_number = f"{code}{random.randint(100, 999)}"
-
-        return {
-            'departure_time': departure_time,
-            'arrival_time': arrival_time,
-            'flight_number': flight_number,
-            'duration': corrected_duration,  # To'g'rilangan davomiylik
-        }
+        """API davomiyligi ba'zan noto'g'ri - ma'lum yo'nalishlar uchun jadvaldan olamiz"""
+        return {'duration': self._get_real_flight_duration(origin, dest)}
 
     def _get_airline_for_route(self, origin: str, dest: str) -> str:
         """Yo'nalish uchun aviakompaniyani aniqlash"""
@@ -1474,7 +1351,7 @@ class RouteOptimizer:
                 if baseline > 0:
                     variant['savings_percent'] = float((savings / baseline) * 100)
 
-    def _calculate_advanced_score(self, variant: Dict, mode: str) -> float:
+    def _calculate_advanced_score(self, variant: Dict, mode: str, cheapest: float) -> float:
         """Ilg'or baholash algoritmi"""
         score = 0
 
@@ -1484,7 +1361,8 @@ class RouteOptimizer:
             cost_ratio = cost / self.budget_max
             cost_score = max(0, 40 * (1 - cost_ratio))
         else:
-            cost_score = max(0, 40 - (cost / 50))
+            # Eng arzon variantga nisbatan (absolyut shkala $2000+ da hammani 0 qilardi)
+            cost_score = 40 * cheapest / cost if cost > 0 else 40
         score += cost_score
 
         # Vaqt balli (0-25)

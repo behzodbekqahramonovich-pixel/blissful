@@ -2,6 +2,9 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
+from apps.authentication.middleware import JWTAuthentication
 from django.shortcuts import get_object_or_404
 from datetime import datetime, date, timedelta
 from .models import TravelSearch, RouteVariant
@@ -9,22 +12,28 @@ from .serializers import (
     TravelSearchSerializer,
     TravelSearchCreateSerializer,
     RouteVariantSerializer,
-    SearchResultSerializer
 )
 from apps.destinations.models import City
-from services.route_finder import RouteFinder
 from services.route_optimizer import RouteOptimizer
 from services.external_apis import travelpayouts_api, booking_api
 from services.popular_routes_scraper import popular_routes_scraper
 from services.rss_feed import rss_feed_service
 import os
+import logging
 import requests as req
+
+logger = logging.getLogger(__name__)
 
 
 class TravelSearchViewSet(viewsets.ModelViewSet):
     """Sayohat qidiruvi API"""
     queryset = TravelSearch.objects.prefetch_related('variants').all()
     serializer_class = TravelSearchSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'search'
+    http_method_names = ['get', 'post', 'head', 'options']
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -55,19 +64,11 @@ class TravelSearchViewSet(viewsets.ModelViewSet):
 
         # Optimallashtirish rejimini olish
         optimization_mode = request.data.get('optimization_mode', 'balanced')
-        use_optimizer = request.data.get('use_optimizer', True)
-        use_live_prices = request.data.get('use_live_prices', True)  # Har doim real narxlar
+        use_live_prices = request.data.get('use_live_prices', True)
 
-        if use_optimizer:
-            # Yangi ilg'or optimizer ishlatish
-            optimizer = RouteOptimizer(search, use_live_prices=use_live_prices)
-            variants = optimizer.find_optimal_route(mode=optimization_mode)
-            saved_variants = optimizer.save_variants(variants)
-        else:
-            # Eski finder ishlatish
-            finder = RouteFinder(search)
-            variants = finder.find_all_routes()
-            saved_variants = finder.save_variants(variants)
+        optimizer = RouteOptimizer(search, use_live_prices=use_live_prices)
+        variants = optimizer.find_optimal_route(mode=optimization_mode)
+        saved_variants = optimizer.save_variants(variants)
 
         # Tavsiya qilingan variant
         recommended = next(
@@ -424,7 +425,7 @@ Muhim: Javoblaringiz qisqa emas, balki TO'LIQ va BATAFSIL bo'lishi kerak!"""
 
             # Google Gemini API - REST orqali to'g'ridan-to'g'ri (v1)
             # Gemini 2.5 Flash - eng yangi va tez model
-            url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={api_key}"
+            url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent"
 
             payload = {
                 "contents": [{
@@ -440,7 +441,7 @@ Muhim: Javoblaringiz qisqa emas, balki TO'LIQ va BATAFSIL bo'lishi kerak!"""
                 }
             }
 
-            response = req.post(url, json=payload, timeout=60)
+            response = req.post(url, json=payload, headers={'x-goog-api-key': api_key}, timeout=60)
             response.raise_for_status()
 
             data = response.json()
@@ -457,10 +458,11 @@ Muhim: Javoblaringiz qisqa emas, balki TO'LIQ va BATAFSIL bo'lishi kerak!"""
                 'configured': True
             })
 
-        except Exception as e:
+        except Exception:
+            logger.exception('Gemini API xatosi')
             return Response({
                 'success': False,
-                'error': str(e),
+                'error': 'AI xizmati vaqtincha ishlamayapti',
                 'message': 'Kechirasiz, xatolik yuz berdi. Iltimos, qayta urinib ko\'ring.',
                 'configured': True
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

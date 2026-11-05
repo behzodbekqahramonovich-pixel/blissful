@@ -121,8 +121,8 @@ function RegisterModal({ isOpen, onClose, onSwitchToLogin }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (validateForm()) {
-      const { confirmPassword, ...dataToSend } = formData
-      registerMutation.mutate(dataToSend)
+      const { confirmPassword, ...rest } = formData
+      registerMutation.mutate({ ...rest, confirm_password: confirmPassword })
     }
   }
 

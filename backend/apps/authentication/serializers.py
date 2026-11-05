@@ -36,7 +36,7 @@ class UserLoginSerializer(serializers.Serializer):
 class RegisterSerializer(serializers.ModelSerializer):
     """User registration serializer."""
     password = serializers.CharField(write_only=True, min_length=8)
-    confirm_password = serializers.CharField(write_only=True, required=False)
+    confirm_password = serializers.CharField(write_only=True)
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
     role = serializers.ChoiceField(choices=['traveler', 'agency'], default='traveler')
     agency_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
@@ -55,10 +55,44 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Bu email allaqachon ro'yxatdan o'tgan")
         return value
 
+    def validate_password(self, value):
+        """Parol kuchliligini tekshirish."""
+        if len(value) < 8:
+            raise serializers.ValidationError("Parol kamida 8 ta belgidan iborat bo'lishi kerak")
+
+        # Kamida bitta harf va raqam bo'lishi kerak
+        if not any(char.isdigit() for char in value):
+            raise serializers.ValidationError("Parolda kamida bitta raqam bo'lishi kerak")
+        if not any(char.isalpha() for char in value):
+            raise serializers.ValidationError("Parolda kamida bitta harf bo'lishi kerak")
+
+        return value
+
     def validate(self, data):
+        # Parollar mosligini tekshirish (CRITICAL FIX)
+        password = data.get('password')
+        confirm_password = data.get('confirm_password')
+
+        if password != confirm_password:
+            raise serializers.ValidationError({'confirm_password': 'Parollar mos kelmaydi'})
+
         # Agentlik uchun agency_name majburiy
         if data.get('role') == 'agency' and not data.get('agency_name'):
             raise serializers.ValidationError({'agency_name': 'Agentlik nomi kiritilishi shart'})
+
+        # Telefon raqam format validatsiyasi
+        phone = data.get('phone', '')
+        if phone:
+            # Faqat raqamlar, +, -, probel va qavs ruxsat etilgan
+            import re
+            if not re.match(r'^[\d\s\+\-\(\)]+$', phone):
+                raise serializers.ValidationError({'phone': 'Telefon raqam formati noto\'g\'ri'})
+
+            # Kamida 9 ta raqam bo'lishi kerak
+            digits = re.sub(r'\D', '', phone)
+            if len(digits) < 9:
+                raise serializers.ValidationError({'phone': 'Telefon raqam kamida 9 ta raqamdan iborat bo\'lishi kerak'})
+
         return data
 
     def create(self, validated_data):

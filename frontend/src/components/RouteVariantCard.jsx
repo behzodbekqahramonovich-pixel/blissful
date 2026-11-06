@@ -88,7 +88,7 @@ function RouteVariantCard({ variant, index, onSelect, isSelected, onViewDetails 
       {/* Segmentlar - kompakt */}
       <div className="flex flex-wrap gap-1 mb-2">
         {details?.segments?.map((segment, idx) => {
-          const airlineInfo = getAirlineLogo(segment.airline)
+          const airlineInfo = segment.type === 'ground' ? { code: '🚐', color: '#F59E0B' } : getAirlineLogo(segment.airline)
           return (
             <div key={idx} className="flex items-center gap-1 bg-white/70 rounded px-2 py-1 text-xs">
               <div

@@ -149,4 +149,26 @@ export const hotelsAdminApi = {
   },
 }
 
+// Transport (TransportLeg) Admin API
+export const transportAdminApi = {
+  getAll: async (params = {}) => {
+    const response = await adminApi.get('/admin/transport/', { params })
+    return response.data
+  },
+
+  create: async (data) => {
+    const response = await adminApi.post('/admin/transport/', data)
+    return response.data
+  },
+
+  update: async (id, data) => {
+    const response = await adminApi.put(`/admin/transport/${id}/`, data)
+    return response.data
+  },
+
+  delete: async (id) => {
+    await adminApi.delete(`/admin/transport/${id}/`)
+  },
+}
+
 export default adminApi

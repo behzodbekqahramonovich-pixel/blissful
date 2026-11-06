@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Country, City
+from .models import Country, City, airport_access
 
 
 class CountrySerializer(serializers.ModelSerializer):
@@ -37,4 +37,8 @@ class CityMinimalSerializer(serializers.ModelSerializer):
         fields = ['id', 'iata_code', 'name_uz', 'label']
 
     def get_label(self, obj):
-        return f"{obj.country.flag_emoji} {obj.name_uz} ({obj.iata_code})"
+        code = obj.iata_code
+        if not code:  # aeroportsiz shahar - kam uchraydi, alohida so'rov mayli
+            access = airport_access(obj)
+            code = f"{access[0].iata_code} orqali" if access else 'transfer'
+        return f"{obj.country.flag_emoji} {obj.name_uz} ({code})"

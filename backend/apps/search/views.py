@@ -13,7 +13,7 @@ from .serializers import (
     TravelSearchCreateSerializer,
     RouteVariantSerializer,
 )
-from apps.destinations.models import City
+from apps.destinations.models import City, airport_access
 from services.route_optimizer import RouteOptimizer
 from services.external_apis import travelpayouts_api, booking_api
 from services.popular_routes_scraper import popular_routes_scraper
@@ -47,8 +47,12 @@ class TravelSearchViewSet(viewsets.ModelViewSet):
         data = serializer.validated_data
 
         # Shaharlarni topish
-        origin = get_object_or_404(City, iata_code=data['origin'])
-        destination = get_object_or_404(City, iata_code=data['destination'])
+        origin = get_object_or_404(City, iata_code=data['origin'].upper())
+        dest = data['destination']
+        destination = get_object_or_404(City, pk=dest) if dest.isdigit() else get_object_or_404(City, iata_code=dest.upper())
+        if not destination.iata_code and not airport_access(destination):
+            return Response({'error': "Bu manzil uchun aeroportgacha transport (borish va qaytish) kiritilmagan"},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         # Qidiruvni yaratish
         search = TravelSearch.objects.create(

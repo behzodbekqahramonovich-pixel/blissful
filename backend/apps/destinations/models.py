@@ -30,7 +30,8 @@ class City(models.Model):
     )
     name = models.CharField(max_length=100, verbose_name="Nomi (English)")
     name_uz = models.CharField(max_length=100, verbose_name="Nomi (O'zbekcha)")
-    iata_code = models.CharField(max_length=3, unique=True, verbose_name="IATA kodi")
+    # Aeroportsiz shahar: iata_code bo'sh, aeroportga yo'l TransportLeg orqali
+    iata_code = models.CharField(max_length=3, unique=True, null=True, blank=True, verbose_name="IATA kodi")
     latitude = models.DecimalField(
         max_digits=10,
         decimal_places=7,
@@ -55,7 +56,68 @@ class City(models.Model):
         ordering = ['name_uz']
 
     def __str__(self):
-        return f"{self.name_uz} ({self.iata_code})"
+        return f"{self.name_uz} ({self.iata_code or 'transfer'})"
+
+
+class TransportLeg(models.Model):
+    """Graf qirrasi: bir shahardan ikkinchisiga bitta transport turi bilan"""
+    MODES = [('plane', 'Samolyot'), ('train', 'Poyezd'), ('bus', 'Avtobus'),
+             ('car', 'Avtomobil/Taksi')]
+    from_city = models.ForeignKey(City, on_delete=models.CASCADE, related_name='legs_out', verbose_name="Qayerdan")
+    to_city = models.ForeignKey(City, on_delete=models.CASCADE, related_name='legs_in', verbose_name="Qayerga")
+    mode = models.CharField(max_length=10, choices=MODES, verbose_name="Transport turi")
+    duration_min = models.PositiveIntegerField(verbose_name="Davomiylik (daqiqa)")
+    price_usd = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Narx (USD, 1 kishi)")
+    headway_min = models.PositiveIntegerField(default=0, verbose_name="Reyslar oralig'i (daqiqa)")  # 0 = istalgan vaqtda (taksi)
+    first_departure = models.TimeField(null=True, blank=True, verbose_name="Birinchi reys")
+    last_departure = models.TimeField(null=True, blank=True, verbose_name="Oxirgi reys")
+    is_bidirectional = models.BooleanField(default=True, verbose_name="Ikki tomonga")
+    source = models.CharField(max_length=20, default='admin', verbose_name="Manba")  # admin | api | estimate
+    link = models.URLField(blank=True, verbose_name="Havola")
+    is_active = models.BooleanField(default=True, verbose_name="Faol")
+
+    class Meta:
+        verbose_name = "Transport qirrasi"
+        verbose_name_plural = "Transport qirralari"
+        unique_together = ['from_city', 'to_city', 'mode']
+        ordering = ['from_city__name_uz', 'to_city__name_uz', 'mode']
+
+    def __str__(self):
+        arrow = '↔' if self.is_bidirectional else '→'
+        return f"{self.from_city.name_uz} {arrow} {self.to_city.name_uz} ({self.get_mode_display()})"
+
+    def directions(self):
+        """Qirra yuradigan yo'nalishlar: [(qayerdan, qayerga), ...]"""
+        pairs = [(self.from_city, self.to_city)]
+        if self.is_bidirectional:
+            pairs.append((self.to_city, self.from_city))
+        return pairs
+
+
+def airport_access(city):
+    """
+    Aeroportsiz shahar uchun eng arzon yer transporti juftligi.
+    Qaytadi: (aeroport, borish qirrasi aeroport→shahar, qaytish qirrasi shahar→aeroport) yoki None.
+    """
+    legs = (TransportLeg.objects.filter(is_active=True).exclude(mode='plane')
+            .filter(models.Q(from_city=city) | models.Q(to_city=city))
+            .select_related('from_city', 'to_city'))
+    to_city, from_city = {}, {}  # aeroport id -> eng arzon qirra
+    for leg in legs:
+        for a, b in leg.directions():
+            if b.id == city.id and a.iata_code:
+                best, key = to_city, a
+            elif a.id == city.id and b.iata_code:
+                best, key = from_city, b
+            else:
+                continue
+            if key.id not in best or leg.price_usd < best[key.id][1].price_usd:
+                best[key.id] = (key, leg)
+    common = to_city.keys() & from_city.keys()
+    if not common:
+        return None
+    aid = min(common, key=lambda i: to_city[i][1].price_usd + from_city[i][1].price_usd)
+    return to_city[aid][0], to_city[aid][1], from_city[aid][1]
 
 
 class PopularRoute(models.Model):

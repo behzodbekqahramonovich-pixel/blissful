@@ -52,6 +52,7 @@ class RouteVariant(models.Model):
         ('multi', "Multi-city"),
         ('optimal_cheap', "Optimal (arzon)"),
         ('optimal_fast', "Optimal (tez)"),
+        ('balanced', "Optimal (muvozanatli)"),
     ]
 
     search = models.ForeignKey(

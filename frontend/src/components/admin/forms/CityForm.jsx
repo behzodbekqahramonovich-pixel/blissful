@@ -17,7 +17,7 @@ function CityForm({ item, onClose, onSuccess }) {
   // Fetch countries for dropdown
   const { data: countriesData } = useQuery({
     queryKey: ['adminCountriesAll'],
-    queryFn: () => countriesAdminApi.getAll({ page_size: 100 }),
+    queryFn: () => countriesAdminApi.getAll({ page_size: 500 }),
   })
 
   useEffect(() => {
@@ -52,6 +52,7 @@ function CityForm({ item, onClose, onSuccess }) {
       latitude: parseFloat(formData.latitude),
       longitude: parseFloat(formData.longitude),
       avg_hotel_price_usd: parseFloat(formData.avg_hotel_price_usd),
+      iata_code: formData.iata_code || null,
     })
   }
 
@@ -123,7 +124,7 @@ function CityForm({ item, onClose, onSuccess }) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              IATA kodi (3 harf) *
+              IATA kodi (aeroport bo'lsa)
             </label>
             <input
               type="text"
@@ -133,7 +134,6 @@ function CityForm({ item, onClose, onSuccess }) {
               onChange={handleChange}
               maxLength={3}
               placeholder="TAS"
-              required
             />
           </div>
 
@@ -197,6 +197,13 @@ function CityForm({ item, onClose, onSuccess }) {
               Tranzit hub shahar
             </label>
           </div>
+
+          {!formData.iata_code && (
+            <div className="p-3 bg-amber-50 rounded-lg text-sm text-amber-700">
+              Aeroportsiz shahar: saqlagandan keyin <b>Transport</b> bo'limida aeroportli shahargacha
+              borish va qaytish yo'lini (taksi, avtobus yoki poyezd) qo'shing — aks holda bu shaharga qidiruv ishlamaydi.
+            </div>
+          )}
 
           {mutation.error && (
             <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg">

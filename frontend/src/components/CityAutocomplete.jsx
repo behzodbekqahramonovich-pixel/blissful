@@ -72,7 +72,7 @@ function CityAutocomplete({ value, onChange, placeholder, hasError = false }) {
                 )}
               >
                 <span className="font-medium">{city.label}</span>
-                <span className="text-gray-400 text-sm">{city.iata_code}</span>
+                <span className="text-gray-400 text-sm">{city.iata_code || '🚐 transfer'}</span>
               </button>
             ))
           ) : (

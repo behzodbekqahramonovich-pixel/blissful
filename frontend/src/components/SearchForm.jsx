@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { useQuery } from '@tanstack/react-query'
+import { format } from 'date-fns'
 import { destinationsApi, searchApi } from '../services/api'
 import useSearchStore from '../store/searchStore'
 import CityAutocomplete from './CityAutocomplete'
@@ -102,9 +103,9 @@ function SearchForm({ compact = false }) {
     try {
       const searchData = {
         origin: origin.iata_code,
-        destination: destination.iata_code,
-        departure_date: departureDate.toISOString().split('T')[0],
-        return_date: returnDate.toISOString().split('T')[0],
+        destination: destination.iata_code || String(destination.id),  // aeroportsiz manzil id bilan
+        departure_date: format(departureDate, 'yyyy-MM-dd'),  // toISOString UTC ga o'girib bir kun orqaga surardi
+        return_date: format(returnDate, 'yyyy-MM-dd'),
         travelers,
         include_transit: includeTransit,
         hotel_stars: hotelStars,

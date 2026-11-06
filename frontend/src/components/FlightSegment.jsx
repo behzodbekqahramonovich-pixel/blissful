@@ -26,6 +26,8 @@ function FlightSegment({ segment }) {
         return { label: 'Qaytish', bg: 'bg-green-500', icon: '🛬' }
       case 'transit':
         return { label: 'Tranzit', bg: 'bg-purple-500', icon: '🔄' }
+      case 'ground':
+        return { label: 'Transfer', bg: 'bg-amber-500', icon: '🚐' }
       default:
         return { label: 'Parvoz', bg: 'bg-gray-500', icon: '✈️' }
     }
@@ -46,7 +48,7 @@ function FlightSegment({ segment }) {
   }
 
   const typeStyle = getTypeStyle()
-  const airlineInfo = getAirlineLogo(airline)
+  const airlineInfo = type === 'ground' ? { code: '🚐', color: '#F59E0B' } : getAirlineLogo(airline)
 
   return (
     <div className="bg-gradient-to-r from-white to-gray-50 rounded-2xl border border-gray-100 p-4 hover:shadow-lg transition-all group">
@@ -93,7 +95,7 @@ function FlightSegment({ segment }) {
                   <div className="text-xs text-gray-500 whitespace-nowrap">{formatDuration(duration)}</div>
                 </div>
                 <div className="absolute top-1/2 right-0 -translate-y-1/2 text-lg group-hover:translate-x-1 transition-transform">
-                  ✈️
+                  {type === 'ground' ? '🚐' : '✈️'}
                 </div>
               </div>
             </div>

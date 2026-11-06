@@ -26,7 +26,7 @@ class TravelSearchSerializer(serializers.ModelSerializer):
 class TravelSearchCreateSerializer(serializers.Serializer):
     """Sayohat qidiruvi yaratish serializeri"""
     origin = serializers.CharField(max_length=3)  # IATA kodi
-    destination = serializers.CharField(max_length=3)
+    destination = serializers.CharField(max_length=10)  # IATA kodi yoki aeroportsiz shahar id'si
     departure_date = serializers.DateField()
     return_date = serializers.DateField()
     travelers = serializers.IntegerField(default=1, min_value=1, max_value=10)

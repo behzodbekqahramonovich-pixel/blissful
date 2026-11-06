@@ -16,6 +16,7 @@ const CountriesPage = lazy(() => import('./pages/admin/CountriesPage'))
 const CitiesPage = lazy(() => import('./pages/admin/CitiesPage'))
 const FlightsPage = lazy(() => import('./pages/admin/FlightsPage'))
 const HotelsPage = lazy(() => import('./pages/admin/HotelsPage'))
+const TransportPage = lazy(() => import('./pages/admin/TransportPage'))
 
 function App() {
   return (
@@ -67,6 +68,14 @@ function App() {
         element={
           <ProtectedRoute>
             <HotelsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/transport"
+        element={
+          <ProtectedRoute>
+            <TransportPage />
           </ProtectedRoute>
         }
       />

@@ -12,6 +12,7 @@ function AdminLayout({ children }) {
     { path: '/admin/cities', label: 'Shaharlar', icon: '🏙️', iconClass: 'icon-3d-sm' },
     { path: '/admin/flights', label: 'Parvozlar', icon: '✈️', iconClass: 'icon-3d-sm' },
     { path: '/admin/hotels', label: 'Mehmonxonalar', icon: '🏨', iconClass: 'icon-3d-sm' },
+    { path: '/admin/transport', label: 'Transport', icon: '🚆', iconClass: 'icon-3d-sm' },
   ]
 
   const handleLogout = () => {

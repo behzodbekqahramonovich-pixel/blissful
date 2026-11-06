@@ -1,23 +1,23 @@
 """
-Route Optimizer Service - Ilg'or marshrut optimallashtirish algoritmi
+Route Optimizer Service - Multimodal marshrut optimallashtirish
 
-Bu servis quyidagi funksiyalarni o'z ichiga oladi:
-1. Dijkstra algoritmi - eng arzon/tez yo'lni topish
-2. Dinamik hub tanlash - haqiqiy narxlar asosida
-3. Ko'p kriteriyali baholash (narx, vaqt, qulaylik)
-4. Byudjet cheklovlari
-5. Vaqt optimallashtiruvi
-6. Real API integratsiya (Travelpayouts, Booking.com)
+Bitta graf: tugun = shahar, qirra = samolyot (FlightPrice, taxminiy, jonli API)
+yoki yer transporti (TransportLeg: poyezd, avtobus, taksi).
+Bitta algoritm: vaznli Dijkstra, score = narx + λ * soat (docs/MULTIMODAL_DESIGN.md, 2-bo'lim).
+Barcha variantlar (arzon, muvozanatli, tez, to'g'ridan-to'g'ri, tranzit, multi-city)
+shu algoritmdan turli λ, stopover va parvozlar soni cheklovi bilan chiqadi.
 """
 
 import heapq
 import logging
+from collections import namedtuple
+from dataclasses import dataclass, field
 from decimal import Decimal
-from datetime import timedelta, datetime
+from datetime import timedelta
 from typing import List, Dict, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from django.db.models import Min, Avg, Q
-from apps.destinations.models import City
+from django.db.models import Min, Avg
+from apps.destinations.models import City, TransportLeg, airport_access
 from apps.pricing.models import FlightPrice, HotelPrice
 from apps.search.models import TravelSearch, RouteVariant
 from services.external_apis import travelpayouts_api, booking_api
@@ -27,9 +27,43 @@ logger = logging.getLogger(__name__)
 # Parallel API chaqiruvlar uchun thread pool
 MAX_WORKERS = 10  # Bir vaqtda maksimum API chaqiruvlar soni
 
+# Graf qirrasi. price - 1 kishi uchun USD, duration/headway - daqiqa
+Edge = namedtuple('Edge', 'to mode price duration headway source link airline')
+
+MAX_LEGS = 5        # bir yo'nalishdagi qirralar soni (qolishlar bilan)
+DAY_HOURS = 16      # bir kunda yo'lga ketadigan maksimal soat
+
+# Ikki ketma-ket qirra orasida o'tish vaqti (daqiqa) - transport juftligiga bog'liq
+TRANSFER_MIN = {
+    ('plane', 'plane'): 120,   # bir aeroport ichida
+    ('plane', 'train'): 150,   # aeroport → vokzal
+    ('plane', 'bus'): 150,
+    ('plane', 'car'): 45,
+    ('train', 'plane'): 180,   # ro'yxatdan o'tish bilan
+    ('train', 'train'): 40,
+    ('car', 'plane'): 150,
+    ('car', 'train'): 40,
+    ('bus', 'plane'): 150,
+}
+DEFAULT_TRANSFER_MIN = 60
+
+
+@dataclass(order=True)
+class State:
+    score: float
+    city: str = field(compare=False)
+    day: int = field(compare=False)
+    prev_mode: str = field(compare=False)     # '' = boshlanish yoki tunab qolgandan keyin
+    hours_today: float = field(compare=False)
+    price: float = field(compare=False)       # barcha yo'lovchilar uchun
+    hours: float = field(compare=False)
+    flights: int = field(compare=False)       # samolyot qirralari soni
+    stops_done: int = field(compare=False)    # bajarilgan majburiy qolishlar (tartib bilan)
+    legs: list = field(compare=False)
+
 
 class RouteOptimizer:
-    """Ilg'or marshrut optimallashtiruvchi"""
+    """Multimodal marshrut optimallashtiruvchi"""
 
     # Optimallashtirish rejimlari
     MODE_CHEAPEST = 'cheapest'      # Eng arzon
@@ -37,10 +71,15 @@ class RouteOptimizer:
     MODE_BALANCED = 'balanced'      # Muvozanatli
     MODE_COMFORT = 'comfort'        # Eng qulay
 
+    # 1 soat necha dollarga teng (score = narx + λ * soat).
+    # Tartib muhim: balanced chekka variantlardan biriga teng bo'lsa, dublikat sifatida tushadi.
+    LAMBDAS = {'optimal_cheap': 0, 'optimal_fast': 500, 'balanced': 50}
+    VIA_LAMBDA = 50  # to'g'ridan-to'g'ri, tranzit va multi-city variantlar uchun
+
     def __init__(self, search: TravelSearch, use_live_prices: bool = False):
         self.search = search
         self.origin = search.origin
-        self.destination = search.destination
+        self.destination = search.destination      # aeroportsiz shahar bo'lishi mumkin
         self.departure_date = search.departure_date
         self.return_date = search.return_date
         self.nights = search.nights
@@ -49,51 +88,80 @@ class RouteOptimizer:
         self.budget_max = float(search.budget_max_usd) if search.budget_max_usd else None
         self.use_live_prices = use_live_prices
 
+        # Aeroportsiz manzil uchun jonli narx eng yaqin aeroportgacha olinadi
+        access = None if self.destination.iata_code else airport_access(self.destination)
+        self.dest_airport = access[0] if access else self.destination
+
         # Keshlar
-        self._avg_prices_cache = {}
         self._hotel_cache = {}
         self._live_prices_cache = {}
 
-        # Graf tuzish
-        self._build_flight_graph()
+        self._build_graph()
+        self.origin_key = self._key(self.origin)
+        self.dest_key = self._key(self.destination)
 
         # Parallel API prefetch (agar live prices yoqilgan bo'lsa)
         if self.use_live_prices:
             self._prefetch_flight_prices_parallel()
+            self._add_live_edges()
 
-    def _build_flight_graph(self):
-        """Parvozlar grafini tuzish"""
-        self.graph = {}  # {origin: [(dest, price, duration, airline), ...]}
-        self.cities = {}  # {iata_code: City}
+    @staticmethod
+    def _key(city: City) -> str:
+        """Graf tugunining kaliti: IATA kodi, aeroportsiz shahar uchun id"""
+        return city.iata_code or str(city.id)
 
-        # Barcha shaharlarni olish
-        all_cities = City.objects.select_related('country').all()
-        for city in all_cities:
-            self.cities[city.iata_code] = city
-            self.graph[city.iata_code] = []
+    def _add_edge(self, frm: str, edge: Edge):
+        if frm in self.graph and edge.to in self.graph:  # ikkala shahar ham bazada bo'lsin
+            self.graph[frm].append(edge)
 
-        # Parvoz narxlarini grafga qo'shish
-        flights = FlightPrice.objects.select_related(
-            'origin', 'destination'
-        ).values(
-            'origin__iata_code',
-            'destination__iata_code'
-        ).annotate(
-            min_price=Min('price_usd'),
-            avg_duration=Avg('flight_duration_minutes')
-        )
+    def _has_plane(self, frm: str, to: str) -> bool:
+        return any(e.to == to and e.mode == 'plane' for e in self.graph.get(frm, []))
 
-        for flight in flights:
-            origin = flight['origin__iata_code']
-            dest = flight['destination__iata_code']
-            price = float(flight['min_price'])
-            duration = int(flight['avg_duration'] or 240)
+    def _build_graph(self):
+        """Samolyot + yer transporti grafini tuzish"""
+        self.graph = {}   # {key: [Edge, ...]}
+        self.cities = {}  # {key: City}
+        for city in City.objects.select_related('country').all():
+            k = self._key(city)
+            self.cities[k] = city
+            self.graph[k] = []
 
-            if origin in self.graph:
-                self.graph[origin].append((dest, price, duration, 'Multiple'))
+        # 1. Bazadagi parvozlar: yo'nalish bo'yicha minimal narx
+        flights = FlightPrice.objects.values(
+            'origin__iata_code', 'destination__iata_code'
+        ).annotate(min_price=Min('price_usd'), avg_duration=Avg('flight_duration_minutes'))
+        for f in flights:
+            self._add_edge(f['origin__iata_code'], Edge(
+                f['destination__iata_code'], 'plane', float(f['min_price']),
+                int(f['avg_duration'] or 240), 0, 'graph_cache', '', '',
+            ))
 
-        # Hub shaharlar orasida standart narxlar qo'shish
+        # Aniq sanadagi eng arzon parvoz: {(qayerdan, qayerga, sana): (narx, aviakompaniya, daqiqa)}
+        self._dated = {}
+        for f in FlightPrice.objects.values_list(
+            'origin__iata_code', 'destination__iata_code', 'departure_date',
+            'price_usd', 'airline', 'flight_duration_minutes'
+        ).order_by('-price_usd'):
+            self._dated[f[:3]] = (float(f[3]), f[4], f[5])
+
+        # 2. Hub shaharlar orasida taxminiy narxlar
         self._add_estimated_routes()
+
+        # 3. Yer transporti (va admin kiritgan taxminiy aviaqirralar)
+        for leg in TransportLeg.objects.filter(is_active=True).select_related('from_city', 'to_city'):
+            for a, b in leg.directions():
+                frm, to = self._key(a), self._key(b)
+                if leg.mode == 'plane' and self._has_plane(frm, to):
+                    continue  # sanali FlightPrice ustun
+                self._add_edge(frm, Edge(to, leg.mode, float(leg.price_usd), leg.duration_min,
+                                         leg.headway_min, leg.source, leg.link, leg.get_mode_display()))
+
+    def _add_live_edges(self):
+        """Prefetch topgan, lekin grafda yo'q parvozlarni qo'shish"""
+        for (frm, to, _), data in self._live_prices_cache.items():
+            if not self._has_plane(frm, to):
+                self._add_edge(frm, Edge(to, 'plane', data['price'], data['duration'], 0,
+                                         'live_api', data.get('link', ''), data.get('airline', '')))
 
     def _add_estimated_routes(self):
         """Taxminiy marshrutlarni qo'shish"""
@@ -302,15 +370,9 @@ class RouteOptimizer:
         }
 
         for (origin, dest), (price, duration) in estimated_prices.items():
-            if origin in self.graph:
-                # Mavjud bo'lmasa qo'shish
-                existing = [x for x in self.graph[origin] if x[0] == dest]
-                if not existing:
-                    self.graph[origin].append((dest, price, duration, 'Estimated'))
-            if dest in self.graph:
-                existing = [x for x in self.graph[dest] if x[0] == origin]
-                if not existing:
-                    self.graph[dest].append((origin, price, duration, 'Estimated'))
+            for a, b in ((origin, dest), (dest, origin)):
+                if not self._has_plane(a, b):  # bazadagi narx ustun
+                    self._add_edge(a, Edge(b, 'plane', price, duration, 0, 'estimated', '', ''))
 
     def _prefetch_flight_prices_parallel(self):
         """Barcha kerakli yo'nalishlar uchun narxlarni parallel olish"""
@@ -320,7 +382,7 @@ class RouteOptimizer:
         # Kerakli yo'nalishlarni aniqlash
         routes_to_fetch = set()
         origin_code = self.origin.iata_code
-        dest_code = self.destination.iata_code
+        dest_code = self.dest_airport.iata_code
 
         # Asosiy yo'nalishlar
         routes_to_fetch.add((origin_code, dest_code, self.departure_date))
@@ -379,49 +441,49 @@ class RouteOptimizer:
                     origin, dest, dep_date, data = result
                     cache_key = (origin, dest, dep_date)
                     # Vaqtlarni qo'shish
-                    data.update(self._generate_flight_times(origin, dest, data['duration']))
+                    data['duration'] = self._flight_duration(origin, dest, data['duration'])
                     self._live_prices_cache[cache_key] = data
 
         elapsed = time.time() - start_time
         logger.info(f"Prefetch yakunlandi: {len(self._live_prices_cache)} ta narx, {elapsed:.2f}s")
 
+
     def find_optimal_route(self, mode: str = MODE_BALANCED) -> List[Dict]:
-        """Optimal marshrutni topish"""
+        """Barcha variantlarni bitta shortest_chain bilan topish"""
         variants = []
+        start, goal = self.origin_key, self.dest_key
 
-        # 1. Dijkstra bilan eng arzon yo'l
-        cheapest_path = self._dijkstra_cheapest(
-            self.origin.iata_code,
-            self.destination.iata_code
-        )
-        if cheapest_path:
-            variant = self._build_variant_from_path(cheapest_path, 'optimal_cheap')
-            if variant:
-                variants.append(variant)
+        # 1. To'g'ridan-to'g'ri: har yo'nalishda ko'pi bilan 1 ta parvoz (yer transporti mumkin).
+        #    Birinchi turadi: tejamkorlik shunga nisbatan hisoblanadi, bir xil optimal variant dublikat bo'ladi.
+        variants.append(self._build_trip('direct', self.VIA_LAMBDA, max_flights=1))
 
-        # 2. Dijkstra bilan eng tez yo'l
-        fastest_path = self._dijkstra_fastest(
-            self.origin.iata_code,
-            self.destination.iata_code
-        )
-        if fastest_path and fastest_path != cheapest_path:
-            variant = self._build_variant_from_path(fastest_path, 'optimal_fast')
-            if variant:
-                variants.append(variant)
+        # 2. Uch xil λ - eng arzon, muvozanatli, eng tez
+        for route_type, lam in self.LAMBDAS.items():
+            variants.append(self._build_trip(route_type, lam))
 
-        # 3. To'g'ridan-to'g'ri parvoz
-        direct = self._find_direct_route()
-        if direct:
-            variants.append(direct)
+        # 3. Hub orqali tranzit: hubda 1 tun
+        transit = [self._build_trip('transit', self.VIA_LAMBDA, stopovers=[(hub, 1)])
+                   for hub in self._get_dynamic_hubs() if hub not in (start, goal)]
+        transit = sorted(filter(None, transit), key=lambda v: v['total_cost'])
+        variants.extend(transit[:3])
 
-        # 4. Eng yaxshi tranzit variantlar
-        transit_variants = self._find_best_transit_routes()
-        variants.extend(transit_variants)
-
-        # 5. Ko'p shaharli marshrutlar
+        # 4. Ko'p shaharli marshrutlar
         if self.search.include_transit and self.nights >= 5:
-            multi_variants = self._find_smart_multi_city()
-            variants.extend(multi_variants)
+            per_city = max(1, self.nights // 3)
+            multi = 0
+            for hub1, hub2 in [('DXB', 'IST'), ('IST', 'DXB'), ('DOH', 'BKK')]:
+                if {hub1, hub2} & {start, goal}:
+                    continue
+                v = self._build_trip('multi', self.VIA_LAMBDA, stopovers=[(hub1, per_city), (hub2, per_city)])
+                if v:
+                    variants.append(v)
+                    multi += 1
+                    if multi >= 2:
+                        break
+
+        variants = [v for v in variants if v]
+        # Hub orqali majburlangan yo'l boshlang'ich shaharga qaytib kelsa (TAS→DXB→TAS→UGC) - ma'nosiz
+        variants = [v for v in variants if len(set(v['cities_sequence'])) == len(v['cities_sequence'])]
 
         # Byudjet cheklovini qo'llash
         if self.budget_max:
@@ -445,678 +507,215 @@ class RouteOptimizer:
 
         return variants
 
-    def _dijkstra_cheapest(self, start: str, end: str) -> Optional[List[str]]:
-        """Dijkstra algoritmi - eng arzon yo'l"""
-        if start not in self.graph or end not in self.graph:
+    def shortest_chain(self, start: str, goal: str, start_day: int, lam: float,
+                       stopovers: List[Tuple[str, int]] = (), max_flights: Optional[int] = None) -> Optional[State]:
+        """
+        Vaznli Dijkstra: score = narx + lam * soat.
+        Holat = (shahar, kun, oldingi transport, bajarilgan stopoverlar soni).
+        stopovers = [(shahar, tunlar), ...] - shu tartibda tunab o'tish majburiy.
+        max_flights - samolyot qirralari soni cheklovi (to'g'ridan-to'g'ri variant uchun 1).
+        Qaytadi: oxirgi holat (legs, day, price, hours) yoki None.
+        """
+        if start not in self.graph or goal not in self.graph:
             return None
-
-        # Priority queue: (cost, city, path)
-        heap = [(0, start, [start])]
-        visited = set()
+        heap = [State(0.0, start, start_day, '', 0.0, 0.0, 0.0, 0, 0, [])]
+        best = {}
 
         while heap:
-            cost, current, path = heapq.heappop(heap)
-
-            if current in visited:
+            s = heapq.heappop(heap)
+            key = (s.city, s.day, s.prev_mode, s.stops_done)
+            if key in best:
                 continue
-            visited.add(current)
+            best[key] = s.score
 
-            if current == end:
-                return path
+            if s.city == goal and s.stops_done == len(stopovers):
+                return s
+            if len(s.legs) >= MAX_LEGS:
+                continue
 
-            for neighbor, price, duration, airline in self.graph.get(current, []):
-                if neighbor not in visited:
-                    new_cost = cost + price
-                    heapq.heappush(heap, (new_cost, neighbor, path + [neighbor]))
+            # 1) Navbatdagi majburiy qolish shu shaharda bo'lsa - tunab qolish qirrasi
+            if s.stops_done < len(stopovers) and stopovers[s.stops_done][0] == s.city:
+                nights = stopovers[s.stops_done][1]
+                hotel = float(self._get_hotel_cost(s.city, nights))
+                heapq.heappush(heap, State(
+                    s.score + hotel, s.city, s.day + nights, '', 0.0, s.price + hotel, s.hours,
+                    s.flights, s.stops_done + 1,
+                    s.legs + [{'type': 'stay', 'city': s.city, 'day': s.day, 'nights': nights, 'price': hotel}]))
 
+            # 2) Transport qirralari
+            for e in self.graph[s.city]:
+                if e.mode == 'plane' and max_flights is not None and s.flights >= max_flights:
+                    continue
+                transfer = TRANSFER_MIN.get((s.prev_mode, e.mode), DEFAULT_TRANSFER_MIN) if s.prev_mode else 0
+                wait = e.headway / 2
+                day = s.day
+                info = self._leg_info(s.city, e, day)
+                leg_hours = (transfer + wait + info['duration']) / 60
+                hours_today = s.hours_today + leg_hours
+                if hours_today > DAY_HOURS:      # kun tugadi, ertaga davom
+                    day += 1
+                    hours_today = leg_hours
+                    if e.mode == 'plane':        # ertangi parvoz narxi boshqa bo'lishi mumkin
+                        info = self._leg_info(s.city, e, day)
+                price = s.price + info['price'] * self.travelers
+                hours = s.hours + leg_hours
+                leg = {**info, 'type': 'transport', 'from': s.city, 'to': e.to, 'mode': e.mode, 'day': day,
+                       'wait': round(wait), 'transfer': transfer}
+                heapq.heappush(heap, State(
+                    price + lam * hours, e.to, day, e.mode, hours_today, price, hours,
+                    s.flights + (e.mode == 'plane'), s.stops_done, s.legs + [leg]))
         return None
 
-    def _dijkstra_fastest(self, start: str, end: str) -> Optional[List[str]]:
-        """Dijkstra algoritmi - eng tez yo'l"""
-        if start not in self.graph or end not in self.graph:
+    def _leg_info(self, frm: str, e: Edge, day: int) -> Dict:
+        """Qirraning shu kundagi narxi va ma'lumoti. Jonli API qirra ichida chaqirilmaydi."""
+        if e.mode != 'plane':
+            return {'price': e.price, 'airline': e.airline, 'duration': e.duration,
+                    'data_source': e.source, 'link': e.link}
+        date = self.departure_date + timedelta(days=day)
+        live = self._live_prices_cache.get((frm, e.to, str(date))) or next(
+            (v for k, v in self._live_prices_cache.items() if k[:2] == (frm, e.to)), None)
+        if live:
+            return {'price': live['price'], 'airline': live.get('airline', 'Aviakompaniya'),
+                    'duration': live['duration'], 'data_source': 'live_api', 'link': live.get('link', '')}
+        dated = self._dated.get((frm, e.to, date))
+        if dated:
+            price, airline, duration = dated
+            return {'price': price, 'airline': airline, 'duration': self._flight_duration(frm, e.to, duration),
+                    'data_source': 'database', 'link': ''}
+        return {'price': e.price, 'airline': e.airline or self._get_airline_for_route(frm, e.to),
+                'duration': self._flight_duration(frm, e.to, e.duration),
+                'data_source': e.source, 'link': e.link}
+
+    def _build_trip(self, route_type: str, lam: float, stopovers: List[Tuple[str, int]] = (),
+                    max_flights: Optional[int] = None) -> Optional[Dict]:
+        """Borish yo'li + manzildagi tunlar + qaytish yo'li"""
+        out = self.shortest_chain(self.origin_key, self.dest_key, 0, lam, list(stopovers), max_flights)
+        if not out:
             return None
-
-        heap = [(0, start, [start])]
-        visited = set()
-
-        while heap:
-            time, current, path = heapq.heappop(heap)
-
-            if current in visited:
-                continue
-            visited.add(current)
-
-            if current == end:
-                return path
-
-            for neighbor, price, duration, airline in self.graph.get(current, []):
-                if neighbor not in visited:
-                    # Vaqtga layover qo'shamiz (2 soat)
-                    new_time = time + duration + (120 if len(path) > 1 else 0)
-                    heapq.heappush(heap, (new_time, neighbor, path + [neighbor]))
-
-        return None
-
-    def _build_variant_from_path(self, path: List[str], route_type: str) -> Optional[Dict]:
-        """Yo'ldan variant yaratish"""
-        if len(path) < 2:
+        dest_nights = self.nights - out.day
+        if dest_nights < 1:
+            return None  # yo'lda juda ko'p kun ketdi
+        back = self._return_chain(lam, max_flights)
+        if not back:
             return None
+        return self._assemble(route_type, out, dest_nights, back)
 
-        segments = []
-        total_flight_cost = 0
-        total_duration = 0
+    def _return_chain(self, lam: float, max_flights: Optional[int]) -> Optional[State]:
+        """Qaytish yo'li - stopoversiz, bir xil parametrlar uchun bir marta hisoblanadi"""
+        if not hasattr(self, '_back_cache'):
+            self._back_cache = {}
+        key = (lam, max_flights)
+        if key not in self._back_cache:
+            self._back_cache[key] = self.shortest_chain(self.dest_key, self.origin_key, self.nights, lam,
+                                                        [], max_flights)
+        return self._back_cache[key]
 
-        current_date = self.departure_date
+    def _label(self, key: str) -> Tuple[str, str]:
+        """Segment uchun (kod, nom). Aeroportsiz shahar: (shahar nomi, mamlakat nomi)"""
+        city = self.cities.get(key)
+        if not city:
+            return key, key
+        if city.iata_code:
+            return city.iata_code, city.name_uz
+        return city.name_uz, city.country.name_uz
 
-        for i in range(len(path) - 1):
-            origin_code = path[i]
-            dest_code = path[i + 1]
+    def _hotel_entry(self, key: str, nights: int, total: float) -> Dict:
+        return {
+            'city': self._label(key)[0],
+            'city_name': self._get_city_name(key),
+            'nights': nights,
+            'price_per_night': total / nights if nights > 0 else 0,
+            'total_price': total,
+            'stars': self.hotel_stars,
+        }
 
-            flight_info = self._get_flight_info(origin_code, dest_code, current_date)
+    def _assemble(self, route_type: str, out: State, dest_nights: int, back: State) -> Dict:
+        """Dijkstra natijasini variant formatiga o'tkazish (frontend kutgan details.segments)"""
+        segments, hotels = [], []
+        sequence = [self._label(self.origin_key)[0]]
+        first_flight = True
 
-            # Real narx topilmasa, None qaytarish
-            if not flight_info:
-                return None
+        for direction, chain in (('out', out), ('back', back)):
+            for leg in chain.legs:
+                if leg['type'] == 'stay':
+                    hotels.append(self._hotel_entry(leg['city'], leg['nights'], leg['price']))
+                    continue
+                if leg['mode'] != 'plane':
+                    seg_type = 'ground'
+                elif direction == 'back':
+                    seg_type = 'inbound'
+                else:
+                    seg_type = 'outbound' if first_flight else 'transit'
+                    first_flight = False
+                (frm, frm_name), (to, to_name) = self._label(leg['from']), self._label(leg['to'])
+                segments.append({
+                    'from': frm, 'from_name': frm_name, 'to': to, 'to_name': to_name,
+                    'price': leg['price'], 'airline': leg['airline'], 'duration': leg['duration'],
+                    'date': str(self.departure_date + timedelta(days=leg['day'])),
+                    'type': seg_type, 'mode': leg['mode'],
+                    'data_source': leg['data_source'], 'link': leg['link'],
+                    'wait_min': leg['wait'], 'transfer_min': leg['transfer'],
+                })
+                if direction == 'out':
+                    sequence.append(to)
 
-            segment = {
-                'from': origin_code,
-                'from_name': self._get_city_name(origin_code),
-                'to': dest_code,
-                'to_name': self._get_city_name(dest_code),
-                'price': flight_info['price'],
-                'airline': flight_info['airline'],
-                'duration': flight_info['duration'],
-                'date': str(current_date),
-                'type': 'outbound' if i == 0 else 'transit',
-                'data_source': flight_info.get('data_source', 'unknown'),
-                'link': flight_info.get('link', ''),
-            }
-            segments.append(segment)
-            total_flight_cost += flight_info['price']
-            total_duration += flight_info['duration']
+        dest_hotel = float(self._get_hotel_cost(self.dest_key, dest_nights))
+        hotels.append(self._hotel_entry(self.dest_key, dest_nights, dest_hotel))
 
-            # Keyingi kun (layover uchun)
-            if i < len(path) - 2:
-                current_date = current_date + timedelta(days=1)
-
-        # Qaytish parvozi
-        return_flight = self._get_flight_info(
-            self.destination.iata_code,
-            self.origin.iata_code,
-            self.return_date
-        )
-
-        # Real narx topilmasa, None qaytarish
-        if not return_flight:
-            return None
-
-        segments.append({
-            'from': self.destination.iata_code,
-            'from_name': self._get_city_name(self.destination.iata_code),
-            'to': self.origin.iata_code,
-            'to_name': self._get_city_name(self.origin.iata_code),
-            'price': return_flight['price'],
-            'airline': return_flight['airline'],
-            'duration': return_flight['duration'],
-            'date': str(self.return_date),
-            'type': 'inbound',
-            'data_source': return_flight.get('data_source', 'unknown'),
-            'link': return_flight.get('link', ''),
-        })
-        total_flight_cost += return_flight['price']
-        total_duration += return_flight['duration']
-
-        # Mehmonxonalar
-        hotels = self._calculate_hotels_for_path(path)
-        total_hotel_cost = sum(h['total_price'] for h in hotels)
-
-        total_cost = (total_flight_cost * self.travelers) + total_hotel_cost
+        stays = [l['city'] for l in out.legs if l['type'] == 'stay']
+        total_hotel = sum(h['total_price'] for h in hotels)
+        total_transport = sum(s['price'] for s in segments) * self.travelers
+        details = {
+            'segments': segments,
+            'hotels': hotels,
+            'optimization': {'type': route_type, 'algorithm': 'multimodal_dijkstra',
+                             'path_length': len(sequence)},
+            'bonus': self._get_bonus(stays, segments),
+        }
+        if len(stays) == 1:
+            hub = self.cities[stays[0]]
+            details['hub_city'] = {'code': self._label(stays[0])[0], 'name': hub.name_uz,
+                                   'country': hub.country.name_uz, 'flag': hub.country.flag_emoji}
+        if stays:
+            details['countries_count'] = len(stays) + 1
 
         return {
             'route_type': route_type,
-            'cities_sequence': path,
-            'total_flight_cost': float(total_flight_cost * self.travelers),
-            'total_hotel_cost': float(total_hotel_cost),
-            'total_cost': float(total_cost),
-            'total_duration': total_duration,
-            'stops': len(path) - 2,
+            'cities_sequence': sequence,
+            'total_flight_cost': float(total_transport),
+            'total_hotel_cost': float(total_hotel),
+            'total_cost': float(total_transport + total_hotel),
+            'total_duration': round((out.hours + back.hours) * 60),
+            'stops': len(sequence) - 2,
             'savings_percent': 0,
             'savings_amount': 0,
             'is_recommended': False,
             'score': 0,
-            'details': {
-                'segments': segments,
-                'hotels': hotels,
-                'optimization': {
-                    'type': route_type,
-                    'algorithm': 'dijkstra',
-                    'path_length': len(path)
-                },
-                'bonus': self._get_bonus_for_path(path, route_type)
-            }
+            'details': details,
         }
 
-    def _get_bonus_for_path(self, path: List[str], route_type: str) -> str:
-        """Yo'l uchun bonus xabarini yaratish"""
-        stops = len(path) - 2
-        if stops == 0:
-            return "Eng tez va qulay sayohat! Vaqtingizni tejang."
-        elif stops == 1:
-            hub = path[1]
-            return f"2 ta mamlakatni ko'rasiz! {self._get_city_name(hub)} shahriga tashrif buyuring."
-        else:
-            cities = [self._get_city_name(c) for c in path[1:-1]]
-            return f"{stops + 1} ta mamlakatni ko'rasiz! {', '.join(cities)} orqali ajoyib sayohat."
-
-    def _calculate_hotels_for_path(self, path: List[str]) -> List[Dict]:
-        """Yo'l uchun mehmonxonalarni hisoblash"""
-        hotels = []
-        stops = len(path) - 2  # Oraliq shaharlar soni
-
-        if stops == 0:
-            # To'g'ridan-to'g'ri - faqat manzilda
-            hotel_cost = self._get_hotel_cost(self.destination.iata_code, self.nights)
-            hotels.append({
-                'city': self.destination.iata_code,
-                'city_name': self._get_city_name(self.destination.iata_code),
-                'nights': self.nights,
-                'price_per_night': float(hotel_cost / self.nights) if self.nights > 0 else 0,
-                'total_price': float(hotel_cost),
-                'stars': self.hotel_stars
-            })
-        else:
-            # Oraliq shaharlarda ham
-            nights_per_stop = max(1, self.nights // (stops + 1))
-            remaining_nights = self.nights
-
-            for i, city_code in enumerate(path[1:-1]):  # Oraliq shaharlar
-                nights = nights_per_stop if i < stops - 1 else 1
-                remaining_nights -= nights
-                hotel_cost = self._get_hotel_cost(city_code, nights)
-                hotels.append({
-                    'city': city_code,
-                    'city_name': self._get_city_name(city_code),
-                    'nights': nights,
-                    'price_per_night': float(hotel_cost / nights) if nights > 0 else 0,
-                    'total_price': float(hotel_cost),
-                    'stars': self.hotel_stars
-                })
-
-            # Manzilda qolgan kunlar
-            if remaining_nights > 0:
-                hotel_cost = self._get_hotel_cost(self.destination.iata_code, remaining_nights)
-                hotels.append({
-                    'city': self.destination.iata_code,
-                    'city_name': self._get_city_name(self.destination.iata_code),
-                    'nights': remaining_nights,
-                    'price_per_night': float(hotel_cost / remaining_nights) if remaining_nights > 0 else 0,
-                    'total_price': float(hotel_cost),
-                    'stars': self.hotel_stars
-                })
-
-        return hotels
-
-    def _find_direct_route(self) -> Optional[Dict]:
-        """To'g'ridan-to'g'ri marshrut"""
-        outbound = self._get_flight_info(
-            self.origin.iata_code,
-            self.destination.iata_code,
-            self.departure_date
-        )
-        inbound = self._get_flight_info(
-            self.destination.iata_code,
-            self.origin.iata_code,
-            self.return_date
-        )
-
-        # Real narx topilmasa, None qaytarish
-        if not outbound or not inbound:
-            return None
-
-        hotel_cost = self._get_hotel_cost(self.destination.iata_code, self.nights)
-
-        total_flight = (outbound['price'] + inbound['price']) * self.travelers
-        total_cost = total_flight + float(hotel_cost)
-
-        return {
-            'route_type': 'direct',
-            'cities_sequence': [self.origin.iata_code, self.destination.iata_code],
-            'total_flight_cost': float(total_flight),
-            'total_hotel_cost': float(hotel_cost),
-            'total_cost': float(total_cost),
-            'total_duration': outbound['duration'] + inbound['duration'],
-            'stops': 0,
-            'savings_percent': 0,
-            'savings_amount': 0,
-            'is_recommended': False,
-            'score': 0,
-            'details': {
-                'segments': [
-                    {
-                        'from': self.origin.iata_code,
-                        'from_name': self._get_city_name(self.origin.iata_code),
-                        'to': self.destination.iata_code,
-                        'to_name': self._get_city_name(self.destination.iata_code),
-                        'price': outbound['price'],
-                        'airline': outbound['airline'],
-                        'duration': outbound['duration'],
-                        'date': str(self.departure_date),
-                        'type': 'outbound',
-                        'data_source': outbound.get('data_source', 'unknown'),
-                        'link': outbound.get('link', ''),
-                    },
-                    {
-                        'from': self.destination.iata_code,
-                        'from_name': self._get_city_name(self.destination.iata_code),
-                        'to': self.origin.iata_code,
-                        'to_name': self._get_city_name(self.origin.iata_code),
-                        'price': inbound['price'],
-                        'airline': inbound['airline'],
-                        'duration': inbound['duration'],
-                        'date': str(self.return_date),
-                        'type': 'inbound',
-                        'data_source': inbound.get('data_source', 'unknown'),
-                        'link': inbound.get('link', ''),
-                    }
-                ],
-                'hotels': [{
-                    'city': self.destination.iata_code,
-                    'city_name': self._get_city_name(self.destination.iata_code),
-                    'nights': self.nights,
-                    'price_per_night': float(hotel_cost / self.nights) if self.nights > 0 else 0,
-                    'total_price': float(hotel_cost),
-                    'stars': self.hotel_stars
-                }],
-                'bonus': "Eng tez va qulay sayohat! Vaqtingizni tejang."
-            }
-        }
-
-    def _find_best_transit_routes(self) -> List[Dict]:
-        """Eng yaxshi tranzit marshrutlarni topish"""
-        variants = []
-        hubs = self._get_dynamic_hubs()
-
-        for hub_code in hubs:
-            if hub_code in [self.origin.iata_code, self.destination.iata_code]:
-                continue
-
-            variant = self._calculate_transit_variant(hub_code)
-            if variant:
-                variants.append(variant)
-
-        # Narx bo'yicha tartiblash va top 3 ni olish
-        variants.sort(key=lambda x: x['total_cost'])
-        return variants[:3]
+    def _get_bonus(self, stays: List[str], segments: List[Dict]) -> str:
+        """Variant uchun bonus xabari"""
+        if stays:
+            names = [self._get_city_name(c) for c in stays]
+            if len(stays) == 1:
+                return f"2 ta mamlakatni ko'rasiz! {names[0]} shahriga tashrif buyuring."
+            return f"{len(stays) + 1} ta mamlakatni ko'rasiz! {' va '.join(names)} orqali ajoyib sayohat."
+        ground = {s['airline'] for s in segments if s['mode'] != 'plane'}
+        if ground:
+            return f"Uydan uygacha: {', '.join(sorted(ground))} ham hisobga olingan."
+        return "Eng tez va qulay sayohat! Vaqtingizni tejang."
 
     def _get_dynamic_hubs(self) -> List[str]:
-        """Dinamik hub shaharlarni tanlash - optimallashtirilgan"""
-        # Standart hub shaharlarni qaytarish (tez)
-        # Graf allaqachon eng arzon parvozlarni o'z ichiga oladi
-        standard_hubs = ['DXB', 'IST', 'DOH', 'BKK', 'KUL', 'SIN']
+        """Tranzit uchun hub shaharlar: standart hublar + origindan to'g'ri parvoz bor shaharlar"""
+        hubs = ['DXB', 'IST', 'DOH', 'BKK', 'KUL', 'SIN']
+        for e in self.graph.get(self.origin_key, []):
+            if e.mode == 'plane' and e.to not in hubs and e.to not in (self.origin_key, self.dest_key):
+                hubs.append(e.to)
+        return hubs[:8]  # Maksimal 8 ta hub
 
-        # Graf orqali qo'shimcha hublarni topish (DB so'rovsiz)
-        hubs = set(standard_hubs)
-        for dest, price, duration, airline in self.graph.get(self.origin.iata_code, []):
-            if dest not in [self.origin.iata_code, self.destination.iata_code]:
-                hubs.add(dest)
-
-        return list(hubs)[:8]  # Maksimal 8 ta hub
-
-    def _calculate_transit_variant(self, hub_code: str) -> Optional[Dict]:
-        """Tranzit variant hisoblash"""
-        hub = self.cities.get(hub_code)
-        if not hub:
-            return None
-
-        nights_at_hub = 1
-        dest_nights = self.nights - nights_at_hub
-
-        # Parvozlar
-        seg1 = self._get_flight_info(self.origin.iata_code, hub_code, self.departure_date)
-        hub_departure = self.departure_date + timedelta(days=nights_at_hub)
-        seg2 = self._get_flight_info(hub_code, self.destination.iata_code, hub_departure)
-        seg3 = self._get_flight_info(self.destination.iata_code, self.origin.iata_code, self.return_date)
-
-        # Real narx topilmasa, None qaytarish
-        if not seg1 or not seg2 or not seg3:
-            return None
-
-        # Mehmonxonalar
-        hub_hotel = self._get_hotel_cost(hub_code, nights_at_hub)
-        dest_hotel = self._get_hotel_cost(self.destination.iata_code, dest_nights)
-
-        total_flight = (seg1['price'] + seg2['price'] + seg3['price']) * self.travelers
-        total_hotel = float(hub_hotel) + float(dest_hotel)
-        total_cost = total_flight + total_hotel
-
-        return {
-            'route_type': 'transit',
-            'cities_sequence': [self.origin.iata_code, hub_code, self.destination.iata_code],
-            'total_flight_cost': float(total_flight),
-            'total_hotel_cost': float(total_hotel),
-            'total_cost': float(total_cost),
-            'total_duration': seg1['duration'] + seg2['duration'] + seg3['duration'],
-            'stops': 1,
-            'savings_percent': 0,
-            'savings_amount': 0,
-            'is_recommended': False,
-            'score': 0,
-            'details': {
-                'segments': [
-                    {
-                        'from': self.origin.iata_code,
-                        'from_name': self._get_city_name(self.origin.iata_code),
-                        'to': hub_code,
-                        'to_name': self._get_city_name(hub_code),
-                        'price': seg1['price'],
-                        'airline': seg1['airline'],
-                        'duration': seg1['duration'],
-                        'date': str(self.departure_date),
-                        'type': 'outbound',
-                        'data_source': seg1.get('data_source', 'unknown'),
-                        'link': seg1.get('link', ''),
-                    },
-                    {
-                        'from': hub_code,
-                        'from_name': self._get_city_name(hub_code),
-                        'to': self.destination.iata_code,
-                        'to_name': self._get_city_name(self.destination.iata_code),
-                        'price': seg2['price'],
-                        'airline': seg2['airline'],
-                        'duration': seg2['duration'],
-                        'date': str(hub_departure),
-                        'type': 'transit',
-                        'data_source': seg2.get('data_source', 'unknown'),
-                        'link': seg2.get('link', ''),
-                    },
-                    {
-                        'from': self.destination.iata_code,
-                        'from_name': self._get_city_name(self.destination.iata_code),
-                        'to': self.origin.iata_code,
-                        'to_name': self._get_city_name(self.origin.iata_code),
-                        'price': seg3['price'],
-                        'airline': seg3['airline'],
-                        'duration': seg3['duration'],
-                        'date': str(self.return_date),
-                        'type': 'inbound',
-                        'data_source': seg3.get('data_source', 'unknown'),
-                        'link': seg3.get('link', ''),
-                    }
-                ],
-                'hotels': [
-                    {
-                        'city': hub_code,
-                        'city_name': self._get_city_name(hub_code),
-                        'nights': nights_at_hub,
-                        'price_per_night': float(hub_hotel / nights_at_hub) if nights_at_hub > 0 else 0,
-                        'total_price': float(hub_hotel),
-                        'stars': self.hotel_stars
-                    },
-                    {
-                        'city': self.destination.iata_code,
-                        'city_name': self._get_city_name(self.destination.iata_code),
-                        'nights': dest_nights,
-                        'price_per_night': float(dest_hotel / dest_nights) if dest_nights > 0 else 0,
-                        'total_price': float(dest_hotel),
-                        'stars': self.hotel_stars
-                    }
-                ],
-                'hub_city': {
-                    'code': hub_code,
-                    'name': self._get_city_name(hub_code),
-                    'country': hub.country.name_uz if hub and hub.country else '',
-                    'flag': hub.country.flag_emoji if hub and hub.country else ''
-                },
-                'bonus': f"2 ta mamlakatni ko'rasiz! {self._get_city_name(hub_code)} shahriga tashrif buyuring.",
-                'countries_count': 2
-            }
-        }
-
-    def _find_smart_multi_city(self) -> List[Dict]:
-        """Aqlli ko'p shaharli marshrutlar - optimallashtirilgan"""
-        variants = []
-
-        # Faqat eng mashhur kombinatsiyalar (tez)
-        popular_combos = [
-            ('DXB', 'IST'),
-            ('IST', 'DXB'),
-            ('DOH', 'BKK'),
-        ]
-
-        for hub1, hub2 in popular_combos:
-            if hub1 in [self.origin.iata_code, self.destination.iata_code]:
-                continue
-            if hub2 in [self.origin.iata_code, self.destination.iata_code]:
-                continue
-
-            variant = self._calculate_multi_city_variant(hub1, hub2)
-            if variant:
-                variants.append(variant)
-                if len(variants) >= 2:  # Maksimal 2 ta multi-city
-                    break
-
-        return variants
-
-    def _calculate_multi_city_variant(self, hub1: str, hub2: str) -> Optional[Dict]:
-        """Ko'p shaharli variant hisoblash"""
-        hub1_city = self.cities.get(hub1)
-        hub2_city = self.cities.get(hub2)
-        if not hub1_city or not hub2_city:
-            return None
-
-        nights_per_city = max(1, self.nights // 3)
-        dest_nights = self.nights - (nights_per_city * 2)
-
-        # Parvozlar
-        seg1 = self._get_flight_info(self.origin.iata_code, hub1, self.departure_date)
-        hub1_departure = self.departure_date + timedelta(days=nights_per_city)
-        seg2 = self._get_flight_info(hub1, hub2, hub1_departure)
-        hub2_departure = hub1_departure + timedelta(days=nights_per_city)
-        seg3 = self._get_flight_info(hub2, self.destination.iata_code, hub2_departure)
-        seg4 = self._get_flight_info(self.destination.iata_code, self.origin.iata_code, self.return_date)
-
-        # Real narx topilmasa, None qaytarish
-        if not seg1 or not seg2 or not seg3 or not seg4:
-            return None
-
-        # Mehmonxonalar
-        hub1_hotel = self._get_hotel_cost(hub1, nights_per_city)
-        hub2_hotel = self._get_hotel_cost(hub2, nights_per_city)
-        dest_hotel = self._get_hotel_cost(self.destination.iata_code, dest_nights)
-
-        total_flight = (seg1['price'] + seg2['price'] + seg3['price'] + seg4['price']) * self.travelers
-        total_hotel = float(hub1_hotel) + float(hub2_hotel) + float(dest_hotel)
-        total_cost = total_flight + total_hotel
-
-        return {
-            'route_type': 'multi',
-            'cities_sequence': [self.origin.iata_code, hub1, hub2, self.destination.iata_code],
-            'total_flight_cost': float(total_flight),
-            'total_hotel_cost': float(total_hotel),
-            'total_cost': float(total_cost),
-            'total_duration': seg1['duration'] + seg2['duration'] + seg3['duration'] + seg4['duration'],
-            'stops': 2,
-            'savings_percent': 0,
-            'savings_amount': 0,
-            'is_recommended': False,
-            'score': 0,
-            'details': {
-                'segments': [
-                    {
-                        'from': self.origin.iata_code,
-                        'from_name': self._get_city_name(self.origin.iata_code),
-                        'to': hub1,
-                        'to_name': self._get_city_name(hub1),
-                        'price': seg1['price'],
-                        'airline': seg1['airline'],
-                        'duration': seg1['duration'],
-                        'date': str(self.departure_date),
-                        'type': 'outbound',
-                        'data_source': seg1.get('data_source', 'unknown'),
-                        'link': seg1.get('link', ''),
-                    },
-                    {
-                        'from': hub1,
-                        'from_name': self._get_city_name(hub1),
-                        'to': hub2,
-                        'to_name': self._get_city_name(hub2),
-                        'price': seg2['price'],
-                        'airline': seg2['airline'],
-                        'duration': seg2['duration'],
-                        'date': str(hub1_departure),
-                        'type': 'transit',
-                        'data_source': seg2.get('data_source', 'unknown'),
-                        'link': seg2.get('link', ''),
-                    },
-                    {
-                        'from': hub2,
-                        'from_name': self._get_city_name(hub2),
-                        'to': self.destination.iata_code,
-                        'to_name': self._get_city_name(self.destination.iata_code),
-                        'price': seg3['price'],
-                        'airline': seg3['airline'],
-                        'duration': seg3['duration'],
-                        'date': str(hub2_departure),
-                        'type': 'transit',
-                        'data_source': seg3.get('data_source', 'unknown'),
-                        'link': seg3.get('link', ''),
-                    },
-                    {
-                        'from': self.destination.iata_code,
-                        'from_name': self._get_city_name(self.destination.iata_code),
-                        'to': self.origin.iata_code,
-                        'to_name': self._get_city_name(self.origin.iata_code),
-                        'price': seg4['price'],
-                        'airline': seg4['airline'],
-                        'duration': seg4['duration'],
-                        'date': str(self.return_date),
-                        'type': 'inbound',
-                        'data_source': seg4.get('data_source', 'unknown'),
-                        'link': seg4.get('link', ''),
-                    }
-                ],
-                'hotels': [
-                    {
-                        'city': hub1,
-                        'city_name': self._get_city_name(hub1),
-                        'nights': nights_per_city,
-                        'price_per_night': float(hub1_hotel / nights_per_city) if nights_per_city > 0 else 0,
-                        'total_price': float(hub1_hotel),
-                        'stars': self.hotel_stars
-                    },
-                    {
-                        'city': hub2,
-                        'city_name': self._get_city_name(hub2),
-                        'nights': nights_per_city,
-                        'price_per_night': float(hub2_hotel / nights_per_city) if nights_per_city > 0 else 0,
-                        'total_price': float(hub2_hotel),
-                        'stars': self.hotel_stars
-                    },
-                    {
-                        'city': self.destination.iata_code,
-                        'city_name': self._get_city_name(self.destination.iata_code),
-                        'nights': dest_nights,
-                        'price_per_night': float(dest_hotel / dest_nights) if dest_nights > 0 else 0,
-                        'total_price': float(dest_hotel),
-                        'stars': self.hotel_stars
-                    }
-                ],
-                'countries_count': 3,
-                'bonus': f"3 ta mamlakatni ko'rasiz! {self._get_city_name(hub1)} va {self._get_city_name(hub2)} orqali ajoyib sayohat."
-            }
-        }
-
-    def _get_flight_info(self, origin: str, dest: str, date) -> Dict:
-        """Parvoz ma'lumotlarini olish - Real API yoki lokal bazadan"""
-
-        # 0. Real vaqtda narxlar (agar yoqilgan bo'lsa)
-        if self.use_live_prices:
-            # Soddalashtirilgan cache key (sanasiz) - narx asosan yo'nalishga bog'liq
-            simple_key = (origin, dest)
-
-            # Avval sodda key bilan qidirish
-            for cached_key, cached_data in self._live_prices_cache.items():
-                if cached_key[0] == origin and cached_key[1] == dest:
-                    return cached_data
-
-            # Aniq sana bilan ham tekshirish
-            cache_key = (origin, dest, str(date))
-            if cache_key in self._live_prices_cache:
-                return self._live_prices_cache[cache_key]
-
-            try:
-                flights = travelpayouts_api.search_flights(origin, dest, date)
-                if flights:
-                    cheapest = min(flights, key=lambda x: x['price'])
-                    result = {
-                        'price': cheapest['price'],
-                        'airline': cheapest.get('airline', 'Aviakompaniya'),
-                        'duration': cheapest.get('duration', 240),
-                        'data_source': 'live_api',
-                        'link': cheapest.get('link', ''),
-                    }
-                    # Vaqtlarni qo'shish
-                    result.update(self._generate_flight_times(origin, dest, result['duration']))
-                    self._live_prices_cache[cache_key] = result
-                    return result
-            except Exception as e:
-                logger.warning(f"Live API xatosi: {e}")
-
-        # 1. Graf dan olish (eng tez - keshdan)
-        for neighbor, price, duration, airline in self.graph.get(origin, []):
-            if neighbor == dest:
-                result = {
-                    'price': price,
-                    'airline': self._get_airline_for_route(origin, dest),
-                    'duration': duration,
-                    'data_source': 'graph_cache'
-                }
-                result.update(self._generate_flight_times(origin, dest, duration))
-                return result
-
-        # 2. Lokal bazadan qidirish (aniq sana)
-        flight = FlightPrice.objects.filter(
-            origin__iata_code=origin,
-            destination__iata_code=dest,
-            departure_date=date
-        ).order_by('price_usd').first()
-
-        if flight:
-            result = {
-                'price': float(flight.price_usd),
-                'airline': flight.airline,
-                'duration': flight.flight_duration_minutes,
-                'data_source': 'database',
-            }
-            result.update(self._generate_flight_times(origin, dest, flight.flight_duration_minutes))
-            return result
-
-        # 3. O'rtacha narxni tekshirish
-        key = (origin, dest)
-        if key in self._avg_prices_cache:
-            return self._avg_prices_cache[key]
-
-        avg_price = FlightPrice.objects.filter(
-            origin__iata_code=origin,
-            destination__iata_code=dest
-        ).aggregate(avg=Avg('price_usd'))['avg']
-
-        if avg_price:
-            result = {
-                'price': float(avg_price),
-                'airline': self._get_airline_for_route(origin, dest),
-                'duration': 240,
-                'data_source': 'database_avg'
-            }
-            result.update(self._generate_flight_times(origin, dest, 240))
-            self._avg_prices_cache[key] = result
-            return result
-
-        # Fallback o'chirilgan - None qaytarish (real narx topilmadi)
-        return None
-
-    def _get_real_flight_duration(self, origin: str, dest: str) -> int:
-        """Haqiqiy parvoz davomiyligini olish (daqiqalarda)"""
+    def _flight_duration(self, origin: str, dest: str, fallback: int) -> int:
+        """Parvoz davomiyligi (daqiqa): API/baza qiymati ba'zan noto'g'ri - ma'lum yo'nalishlar jadvaldan"""
         # To'g'ridan-to'g'ri parvoz davomiyliklari (real ma'lumotlar asosida)
         flight_durations = {
             # O'zbekistondan
@@ -1186,12 +785,8 @@ class RouteOptimizer:
         if reverse_key in flight_durations:
             return flight_durations[reverse_key]
 
-        # Default: 240 daqiqa (4 soat)
-        return 240
-
-    def _generate_flight_times(self, origin: str, dest: str, api_duration: int) -> Dict:
-        """API davomiyligi ba'zan noto'g'ri - ma'lum yo'nalishlar uchun jadvaldan olamiz"""
-        return {'duration': self._get_real_flight_duration(origin, dest)}
+        # Jadvalda yo'q - bazadagi/API qiymati
+        return int(fallback or 240)
 
     def _get_airline_for_route(self, origin: str, dest: str) -> str:
         """Yo'nalish uchun aviakompaniyani aniqlash"""
@@ -1263,9 +858,9 @@ class RouteOptimizer:
         if hasattr(self, '_hotel_cache') and cache_key in self._hotel_cache:
             return self._hotel_cache[cache_key] * nights
 
-        # 2. Lokal bazadan qidirish
+        # 2. Lokal bazadan qidirish (kalit aeroportsiz shahar uchun id - shahar obyekti bo'yicha)
         hotel = HotelPrice.objects.filter(
-            city__iata_code=city_code,
+            city=self.cities.get(city_code),
             stars__gte=self.hotel_stars
         ).order_by('price_per_night_usd').first()
 
@@ -1330,7 +925,9 @@ class RouteOptimizer:
         unique = []
 
         for v in variants:
-            key = tuple(v['cities_sequence'])
+            # Bir xil shaharlar, lekin boshqa transport (poyezd va taksi) - boshqa variant
+            key = tuple((s['from'], s['to'], s['mode']) for s in v['details']['segments']) + \
+                tuple((h['city'], h['nights']) for h in v['details']['hotels'])
             if key not in seen:
                 seen.add(key)
                 unique.append(v)

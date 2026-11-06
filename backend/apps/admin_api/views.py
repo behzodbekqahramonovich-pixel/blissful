@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -8,9 +9,10 @@ from .serializers import (
     AdminCountrySerializer,
     AdminCitySerializer,
     AdminFlightPriceSerializer,
-    AdminHotelPriceSerializer
+    AdminHotelPriceSerializer,
+    AdminTransportLegSerializer
 )
-from apps.destinations.models import Country, City
+from apps.destinations.models import Country, City, TransportLeg
 from apps.pricing.models import FlightPrice, HotelPrice
 
 
@@ -53,6 +55,30 @@ class AdminCityViewSet(viewsets.ModelViewSet):
         if is_hub is not None:
             queryset = queryset.filter(is_hub=is_hub.lower() == 'true')
 
+        return queryset
+
+
+class AdminTransportLegViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for TransportLeg (poyezd, avtobus, taksi, taxminiy parvoz qirralari).
+    Only accessible to admin users.
+    """
+    queryset = TransportLeg.objects.select_related('from_city', 'to_city').all()
+    serializer_class = AdminTransportLegSerializer
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAdminUser]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['from_city__name_uz', 'to_city__name_uz', 'from_city__iata_code', 'to_city__iata_code']
+    ordering_fields = ['price_usd', 'duration_min', 'id', 'mode']
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        city = self.request.query_params.get('city')
+        mode = self.request.query_params.get('mode')
+        if city:
+            queryset = queryset.filter(Q(from_city_id=city) | Q(to_city_id=city))
+        if mode:
+            queryset = queryset.filter(mode=mode)
         return queryset
 
 
@@ -130,4 +156,5 @@ class AdminHotelPriceViewSet(viewsets.ModelViewSet):
             'flights_count': FlightPrice.objects.count(),
             'hotels_count': HotelPrice.objects.count(),
             'hub_cities_count': City.objects.filter(is_hub=True).count(),
+            'transport_legs_count': TransportLeg.objects.count(),
         })

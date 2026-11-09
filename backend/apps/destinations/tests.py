@@ -66,6 +66,16 @@ class GroundTransferTests(APITestCase):
         TransportLeg.objects.filter(mode='train').update(is_active=False)
         self.assertEqual(airport_access(self.xiva)[0], self.ugc)
 
+    def test_search_from_city_without_airport(self):
+        r = self.client.post('/api/v1/search/', {
+            'origin': str(self.xiva.id), 'destination': 'TAS',
+            'departure_date': '2030-01-10', 'return_date': '2030-01-13', 'use_live_prices': False,
+        }, format='json')
+        self.assertEqual(r.status_code, 201, r.content)
+        modes = [s['mode'] for s in r.json()['variants'][0]['details']['segments']]
+        self.assertEqual(modes[0], 'car')     # Xiva -> UGC taksi
+        self.assertEqual(modes[-1], 'car')    # UGC -> Xiva taksi
+
 
 class AdminTransportLegTests(APITestCase):
     def setUp(self):
@@ -102,3 +112,17 @@ class AdminTransportLegTests(APITestCase):
         user = User.objects.create_user('u', password='pass12345')
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {generate_tokens(user)[0]}')
         self.assertEqual(self.client.get(self.url).status_code, 403)
+
+
+class ImportTransportTests(APITestCase):
+    def test_fixture_csvs_import(self):
+        from django.core.management import call_command
+        from .models import TransportLeg
+        c = Country.objects.create(name='UZ', name_uz="O'zbekiston", code='UZ', flag_emoji='', currency='UZS')
+        for code in ('TAS', 'SKD', 'BHK', 'UGC', 'NCU', 'FEG', 'NMA', 'TMJ', 'KSQ', 'IST', 'AYT', 'DXB', 'AUH', 'BKK', 'SSH'):
+            City.objects.create(country=c, name=code, name_uz=code, iata_code=code, latitude=0, longitude=0)
+        call_command('import_transport')
+        self.assertTrue(City.objects.filter(name_uz='Pattaya', iata_code__isnull=True).exists())
+        self.assertGreaterEqual(TransportLeg.objects.count(), 30)
+        call_command('import_transport')  # ikkinchi marta dublikat yaratmaydi
+        self.assertEqual(TransportLeg.objects.filter(from_city__iata_code='SKD', mode='train').count(), 2)

@@ -102,7 +102,7 @@ function SearchForm({ compact = false }) {
 
     try {
       const searchData = {
-        origin: origin.iata_code,
+        origin: origin.iata_code || String(origin.id),
         destination: destination.iata_code || String(destination.id),  // aeroportsiz manzil id bilan
         departure_date: format(departureDate, 'yyyy-MM-dd'),  // toISOString UTC ga o'girib bir kun orqaga surardi
         return_date: format(returnDate, 'yyyy-MM-dd'),

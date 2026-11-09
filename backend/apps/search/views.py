@@ -47,9 +47,11 @@ class TravelSearchViewSet(viewsets.ModelViewSet):
         data = serializer.validated_data
 
         # Shaharlarni topish
-        origin = get_object_or_404(City, iata_code=data['origin'].upper())
-        dest = data['destination']
-        destination = get_object_or_404(City, pk=dest) if dest.isdigit() else get_object_or_404(City, iata_code=dest.upper())
+        # IATA kodi yoki shahar id'si (aeroportsiz shaharlar uchun)
+        def city_by_ref(ref):
+            return get_object_or_404(City, pk=ref) if ref.isdigit() else get_object_or_404(City, iata_code=ref.upper())
+        origin = city_by_ref(data['origin'])
+        destination = city_by_ref(data['destination'])
         if not destination.iata_code and not airport_access(destination):
             return Response({'error': "Bu manzil uchun aeroportgacha transport (borish va qaytish) kiritilmagan"},
                             status=status.HTTP_400_BAD_REQUEST)

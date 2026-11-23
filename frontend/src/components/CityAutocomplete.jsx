@@ -16,6 +16,11 @@ function CityAutocomplete({ value, onChange, placeholder, hasError = false }) {
     staleTime: 1000 * 60 * 5,
   })
 
+  // Qiymat tashqaridan o'rnatilganda (xaritadan tanlash) matnni moslash
+  useEffect(() => {
+    if (value) setQuery(value.name_uz)
+  }, [value])
+
   // Tashqariga bosilganda yopish
   useEffect(() => {
     function handleClickOutside(event) {

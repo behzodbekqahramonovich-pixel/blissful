@@ -10,6 +10,7 @@ const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'))
 const VariantDetailsPage = lazy(() => import('./pages/VariantDetailsPage'))
 const MyTripsPage = lazy(() => import('./pages/MyTripsPage'))
 const AgencyDashboard = lazy(() => import('./pages/AgencyDashboard'))
+const MapPage = lazy(() => import('./pages/MapPage'))
 const AdminLoginPage = lazy(() => import('./pages/admin/AdminLoginPage'))
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
 const CountriesPage = lazy(() => import('./pages/admin/CountriesPage'))
@@ -27,6 +28,7 @@ function App() {
       <Route path="/search" element={<AuthRequired><Layout><SearchResultsPage /></Layout></AuthRequired>} />
       <Route path="/search/:id/variant/:num" element={<AuthRequired><Layout><VariantDetailsPage /></Layout></AuthRequired>} />
       <Route path="/my-trips" element={<AuthRequired><Layout><MyTripsPage /></Layout></AuthRequired>} />
+      <Route path="/map" element={<AuthRequired><Layout><MapPage /></Layout></AuthRequired>} />
       <Route path="/agency" element={<AuthRequired><AgencyDashboard /></AuthRequired>} />
 
       {/* Admin routes */}

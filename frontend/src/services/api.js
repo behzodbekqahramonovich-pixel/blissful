@@ -46,8 +46,8 @@ api.interceptors.response.use(
 // Destinations API
 export const destinationsApi = {
   // Barcha shaharlar
-  getCities: async () => {
-    const response = await api.get('/destinations/cities/')
+  getCities: async (params) => {
+    const response = await api.get('/destinations/cities/', { params })
     return response.data
   },
 

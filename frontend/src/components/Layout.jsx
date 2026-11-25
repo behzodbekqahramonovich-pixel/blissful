@@ -25,6 +25,7 @@ function Layout({ children }) {
 
   const navLinks = [
     { path: '/', label: 'Bosh sahifa', icon: '🏠' },
+    { path: '/map', label: 'Xarita', icon: '🗺️' },
     { path: '/my-trips', label: 'Sayohatlarim', icon: '🧳' },
     // Agentlik uchun dashboard
     ...(user?.role === 'agency' ? [{ path: '/agency', label: 'Dashboard', icon: '🏢' }] : []),

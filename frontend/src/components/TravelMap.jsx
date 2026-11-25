@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
+import useCities from '../hooks/useCities'
 
 // Custom marker ikonkasi
 const createIcon = (color) => {
@@ -34,30 +35,18 @@ function MapBounds({ cities }) {
 }
 
 function TravelMap({ variant, height = '400px' }) {
-  // Shahar koordinatalari (demo uchun)
-  const cityCoordinates = {
-    TAS: { lat: 41.311, lng: 69.279, name: 'Toshkent' },
-    IST: { lat: 41.008, lng: 28.978, name: 'Istanbul' },
-    DXB: { lat: 25.204, lng: 55.270, name: 'Dubai' },
-    DOH: { lat: 25.286, lng: 51.533, name: 'Doha' },
-    AUH: { lat: 24.453, lng: 54.377, name: 'Abu Dhabi' },
-    BKK: { lat: 13.756, lng: 100.501, name: 'Bangkok' },
-    KUL: { lat: 3.139, lng: 101.686, name: 'Kuala Lumpur' },
-    SIN: { lat: 1.352, lng: 103.819, name: 'Singapur' },
-    CAI: { lat: 30.044, lng: 31.235, name: 'Qohira' },
-    AYT: { lat: 36.896, lng: 30.713, name: 'Antalya' },
-  }
+  const { byCode } = useCities()
 
-  // Yo'nalish shaharlari
-  const cities = variant?.cities_sequence?.map((code, index) => {
-    const coord = cityCoordinates[code] || { lat: 0, lng: 0, name: code }
-    return {
-      ...coord,
-      code,
-      isOrigin: index === 0,
-      isDestination: index === variant.cities_sequence.length - 1,
-    }
-  }) || []
+  // Yo'nalish shaharlari (koordinatasi noma'lum kod tashlab ketiladi)
+  const sequence = variant?.cities_sequence || []
+  const cities = sequence.map((code, index) => byCode[code] && {
+    lat: Number(byCode[code].latitude),
+    lng: Number(byCode[code].longitude),
+    name: byCode[code].name_uz,
+    code,
+    isOrigin: index === 0,
+    isDestination: index === sequence.length - 1,
+  }).filter(Boolean)
 
   // Yo'nalish chizig'i
   const routeLine = cities.map(c => [c.lat, c.lng])

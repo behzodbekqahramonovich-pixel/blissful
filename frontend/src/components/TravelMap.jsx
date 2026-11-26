@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import useCities from '../hooks/useCities'
+import { TILES } from '../services/tiles'
 
 // Custom marker ikonkasi
 const createIcon = (color) => {
@@ -76,10 +77,7 @@ function TravelMap({ variant, height = '400px' }) {
       style={{ height, width: '100%' }}
       className="rounded-xl"
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <TileLayer {...TILES} />
 
       {/* Yo'nalish chizig'i */}
       <Polyline

@@ -10,7 +10,9 @@ RUN npm ci
 # Copy project files
 COPY . .
 
-# Build for production
+# Build for production (Vite kalitni build paytida o'qiydi; bo'sh bo'lsa xarita OpenStreetMap'da qoladi)
+ARG VITE_YANDEX_MAPS_KEY
+ENV VITE_YANDEX_MAPS_KEY=$VITE_YANDEX_MAPS_KEY
 RUN npm run build
 
 # Production stage
